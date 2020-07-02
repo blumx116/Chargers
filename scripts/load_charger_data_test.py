@@ -33,7 +33,7 @@ sim.reset()
 i = 0
 done = False
 while not done:
-    _, reward, done, _ = sim.step(rand.randint(0, 5))
+    state, reward, done, _ = sim.step(rand.randint(0, 5))
     print(i, np.sum(reward))
     i += 1
 

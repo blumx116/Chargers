@@ -178,10 +178,8 @@ def array_shuffle(elems: List[np.ndarray], random: Union[int, RandomState] = Non
     """
     random = optional_random(random)
     elems = list(elems)
-    if random is None:
-        random = np.random
     indices = np.arange(len(elems))
-    np.random.shuffle(indices)
+    random.shuffle(indices)
     return [elems[i] for i in indices]
 
 

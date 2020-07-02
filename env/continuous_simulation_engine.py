@@ -126,7 +126,7 @@ class ContinuousSimulationEngine:
             station_occs=self.station_state.copy(),
             station_maxes=self.station_info[:, 2, np.newaxis].copy(),
             car_dest_idx=self.car_state[msk, 3, np.newaxis].copy(),
-            car_locs=self.car_state[msk, 1:3, np.newaxis].copy(),
+            car_locs=self.car_state[msk, 1:3].copy(),
             car_dest_loc=self.car_state[msk, 4:6].copy(),
             t=self.t,
             query_loc=query_loc)
