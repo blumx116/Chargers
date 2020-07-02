@@ -153,7 +153,7 @@ class ContinuousSimulationGenerator:
             assert self.sample_amount <= 1
             result: List[int] = []
             for i in range(len(arrival_counts)):
-                result.append(np.random.binomial(arrival_counts[i], p=self.sample_amount))
+                result.append(self.random.binomial(arrival_counts[i], p=self.sample_amount))
             return result
         else:
             raise TypeError(f"self.sample_amount should be either float or int. Got: {type(self.sample_amount)}")
@@ -161,9 +161,9 @@ class ContinuousSimulationGenerator:
     def _make_initial_cars_(self) -> np.ndarray:
         """
         Makes an empty array to hold car data
-        :return: np.ndarray[float32] : [max_cars, 6] all 0
+        :return: np.ndarray[float32] : [max_cars, 7] all 0
         """
-        return np.zeros((self.max_cars, 6), dtype=np.float32)
+        return np.zeros((self.max_cars, 7), dtype=np.float32)
 
     def _to_queries_(self,
             query_protos: Arrivals) -> Queries:

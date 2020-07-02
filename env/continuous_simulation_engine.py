@@ -16,11 +16,15 @@ Action = int # [range: 0 -> n_stations-1]
 Reward = np.ndarray # np.ndarray[float32] : [n_stations,]
 SimulationState = NamedTuple(
     "SimulationState",
-    [("stations", np.ndarray),  # np.ndarray[float32]: [n_stations, 4]
-        # idx => (occ, x, y, max_occ)
-     ("cars", np.ndarray),# np.ndarray[float32] : [cur_n_cars, 4]
-        # idx => (car_x, car_y, station_idx, station_x, station_y)
-     ('t', int)]) # t = 0 to max_t
+    [('station_locations', np.ndarray),  # np.ndarray[float32] : [n_stations, 2] => (x, y)
+     ("station_occs", np.ndarray),  # np.ndarray[int32] : [n_stations, 1]
+     ("station_maxes", np.ndarray), # np.ndarray[int32] : [n_stations, 1]
+     ("car_locs", np.ndarray),  # np.ndarray[float32]: [n_stations 2 => (x, y)
+     ("car_dest_idx", np.ndarray),  # np.ndarray[int32] : [n_stations, 1]
+     ("car_dest_loc", np.ndarray),  # np.ndarray[float32] : [n_stations, 2] => (x, y)
+     ("t", int), # t = 0:max_t]
+     ('query_loc', np.ndarray) # np.ndarray[float32] : [1, 2] => (x,y)
+     ])
 State = SimulationState
 
 class ContinuousSimulationEngine:
@@ -44,7 +48,7 @@ class ContinuousSimulationEngine:
             one timestep
         :param initial_station_state:  np.ndarray[int8] : [n_stations, 1]
             initial number of occupied slots at stations
-        :param initial_car_state: np.ndarray[float32] : [max_cars, 6]
+        :param initial_car_state: np.ndarray[float32] : [max_cars, 7]
             idx => (used, car_x, car_y, station_idx, station_x, station_y,
                 duration)
             initial locations and destinations of cars by rows
@@ -64,12 +68,12 @@ class ContinuousSimulationEngine:
         self.arrivals: List[List[ArrivalEvent]] = arrivals
         self.queries: List[List[QueryEvent]] = queries
         self.departures: List[List[int]] = departures
-        self.station_state: np.ndarray = initial_station_state
+        self.station_state: np.ndarray = initial_station_state[:, np.newaxis]
         self.car_state: np.ndarray = initial_car_state
         self.station_info: np.ndarray = station_info
 
         self.open_car_indices: PriorityQueue[int] = PriorityQueue()
-        for idx in range(0, self.car_state.shape[0], -1):
+        for idx in reversed(range(self.car_state.shape[0])):
             if not np.any(self.car_state[idx, :]):  # all 0
                 self.open_car_indices.push(idx, idx)
 
@@ -86,7 +90,6 @@ class ContinuousSimulationEngine:
             warnings.warn("Warning: Fill up of car slots possible")
 
         self.t: int = 0
-        self.queued_referrals: List[Action] = []
         self._cur_reward: np.ndarray = self._zero_reward_()
 
     def done(self) -> bool:
@@ -95,7 +98,7 @@ class ContinuousSimulationEngine:
         :return: True if we are at or past the end of the simulation
         False otherwise
         """
-        return self.t >= self.max_t
+        return self.t >= self.max_t - 1
 
     def info(self) -> int:
         """
@@ -105,32 +108,40 @@ class ContinuousSimulationEngine:
         timestep
         :return: remaining number of unhandled queries
         """
-        return len(self._cur_queries_()) - len(self.queued_referrals)
+        return len(self._cur_queries_())
 
     def reward(self) -> Reward:
         return self._cur_reward.copy()
 
     def state(self) -> State:
-        stations = np.concatenate((self.station_state, self.station_info), axis=1)
-        # np.ndarray[float32] : [n_stations, 4]
-        stations: np.ndarray = stations.astype(np.float32, copy=True)
-        # np.ndarray[float32]: [n_stations, 4]
         msk: np.ndarray = self.car_state[:, 0].astype(bool)
         # np.ndarray[bool] : [max_cars, ]
-        cars: np.ndarray = self.car_state[msk, 1:-1].astype(np.float32, copy=True)
-        # np.ndarray[float32] : [cur_n_cars, 4]
-        # exclude first dim because it's always one for all present cars
-        # exclude last dim because it's duration - privileged info
-        return State(stations, cars, self.t)
+        if len(self._cur_queries_()) > 0:
+            query: QueryEvent = self._cur_queries_()[0]
+            query_loc: np.ndarray = np.asarray([[query.x, query.y]]).astype(np.float32)
+        else:
+            query_loc: np.ndarray = np.zeros(shape=(1,2), dtype=np.float32)
+        return State(
+            station_locations=self.station_info[:, :2].copy(),
+            station_occs=self.station_state.copy(),
+            station_maxes=self.station_info[:, 2, np.newaxis].copy(),
+            car_dest_idx=self.car_state[msk, 3, np.newaxis].copy(),
+            car_locs=self.car_state[msk, 1:3, np.newaxis].copy(),
+            car_dest_loc=self.car_state[msk, 4:6].copy(),
+            t=self.t,
+            query_loc=query_loc)
 
     def step(self,
              action: Action = None) -> Tuple[State, Reward, bool, int]:
-        self.queued_referrals.append(action)
         self._cur_reward = self._zero_reward_()
-        if len(self.queued_referrals) >= len(self._cur_queries_()):
-            self._refer_cars_()
+        if len(self._cur_queries_()) > 0:
+            self._refer_car_(action)
+            # note, this will reduce the number of queries by one
+        if len(self._cur_queries_()) == 0:
+            # we can answer all current queries and timestep forward
             self._time_forward_()
             self._process_departures_()
+            self.t += 1
         return self.state(), self.reward(), self.done(), self.info()
 
     def _cur_queries_(self) -> List[QueryEvent]:
@@ -142,17 +153,20 @@ class ContinuousSimulationEngine:
     def _cur_departures_(self) -> List[int]:
         return self.departures[self.t]
 
-    def _move_cars_(self):
-        msk: np.ndarray = self.car_state[:, 0].astype(np.int8)
-        # np.ndarray[int8] : [max_cars,]
+    def _move_cars_(self) -> None:
+        msk: np.ndarray = self.car_state[:, 0].astype(bool)
+        # np.ndarray[bool] : [max_cars,]
         # cur_n_cars = sum(msk)
+        if not np.any(msk):
+            # no cars to move
+            return
         cur_locs: np.ndarray = self.car_state[msk, 1:3]
         dest_locs: np.ndarray = self.car_state[msk, 4:6]
         # both np.ndarray[float32] : [cur_n_cars, 2] => (x, y)
         directions: np.ndarray = dest_locs - cur_locs
-        directions: np.ndarray = normalize(directions, axis=1, norm='L2')
+        directions: np.ndarray = normalize(directions, axis=1, norm='l2')
         # np.ndarray[float32]: [cur_n_cars, 2] => (dx, dy) unit vecs
-        cur_locs += self.car_speed + directions
+        self.car_state[msk, 1:3] += self.car_speed * directions
         dest_station_idxs: np.ndarray = self.car_state[msk, 3].astype(np.int8)
         # np.ndarray[int8] : [cur_n_cars]
         for idx in dest_station_idxs:
@@ -192,12 +206,14 @@ class ContinuousSimulationEngine:
         departures: List[int] = self._cur_departures_()
         for departure in departures:
             assert self.station_state[departure] > 0
-            self.station_state[departures] -= 1
+            self.station_state[departure] -= 1
 
     def _process_referred_arrivals_(self) -> None:
-        msk: np.ndarray = self.car_state[:, 0].astype(np.int8)
-        # np.ndarray[int8] : [max_cars,]
+        msk: np.ndarray = self.car_state[:, 0].astype(bool)
+        # np.ndarray[bool] : [max_cars,]
         # cur_n_cars = sum(msk)
+        if sum(msk) == 0:
+            return
         cur_locs: np.ndarray = self.car_state[msk, 1:3]
         dest_locs: np.ndarray = self.car_state[msk, 4:6]
         # both np.ndarray[float32] : [cur_n_cars, 2] => (x, y)
@@ -218,7 +234,11 @@ class ContinuousSimulationEngine:
             if self._process_arrival_(idx, duration):
                 self._cur_reward[idx] += 3
                 # give 3 reward whenever we have a car successfully arrive
-        self.car_state[msk, :][new_arrivals, :] = 0
+        indices: np.ndarray = np.flatnonzero(msk)
+        # list of nonzero indices
+        indices = indices[np.flatnonzero(new_arrivals)]
+        # gives indices that both had a car and arrived
+        self.car_state[indices, :] = 0
         # set all of the data spots for cars that just arrived to 0
 
         # this is ugly, but we need to put all of the indices back in the pool
@@ -228,18 +248,15 @@ class ContinuousSimulationEngine:
             if arrived:
                 self.open_car_indices.push(idx, idx)
 
-    def _refer_cars_(self) -> None:
-        assert len(self.queued_referrals) == len(self._cur_queries_())
-        while len(self.queued_referrals) >= 0:
-            referral: Action = self.queued_referrals.pop()
-            query: QueryEvent = self._cur_queries_().pop()
-            idx: int = self.open_car_indices.pop()
+    def _refer_car_(self, referral: Action) -> None:
+        query: QueryEvent = self._cur_queries_().pop()
+        idx: int = self.open_car_indices.pop()
 
-            station_x, station_y = self.station_info[referral, :2]
-            self.car_state[idx, :] = np.asarray(
-                [1, query.x, query.y,
-                 referral, station_x, station_y,
-                 query.duration])
+        station_x, station_y = self.station_info[referral, :2]
+        self.car_state[idx, :] = np.asarray(
+            [1, query.x, query.y,
+             referral, station_x, station_y,
+             query.duration])
 
     def _zero_reward_(self) -> Reward:
         return np.zeros(self.n_stations, dtype=np.float32)

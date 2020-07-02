@@ -1,6 +1,7 @@
 import pandas as pd
 
 import numpy.random as rand
+import numpy as np
 
 from env.load_charger_data import load_charger_data
 from env.simulation_helper import load_continuous_simulation
@@ -20,23 +21,20 @@ wandb.config.update({
     'max_cars' : 1000,
     'car_speed': 1,
     'sample_distance': 1,
-    'sample_amount': 2,
+    'sample_amount': 1,
     'date': '06-27-2019',
     'region': 'haidian'
 })
 
 
-load_continuous_simulation(wandb.config)
-
-
-sim = load_day_simulation('06-27-2019', 'beijing', 2, 1, 2, force_reload=True)
+sim = load_continuous_simulation(wandb.config)
 sim.seed(0)
 sim.reset()
 i = 0
 done = False
 while not done:
-    _,_,done,_ = sim.step(rand.randint(0, 5))
-    print(i)
+    _, reward, done, _ = sim.step(rand.randint(0, 5))
+    print(i, np.sum(reward))
     i += 1
 
 print()

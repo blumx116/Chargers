@@ -13,6 +13,7 @@ from env.continuous_simulation_generator import ContinuousSimulationGenerator
 from env.simulation_events import Arrivals, ArrivalEvent, Queries, QueryEvent
 from misc.utils import optional_random, array_shuffle
 
+
 class ContinuousSimulation(gym.Env):
     def __init__(self,
             arrivals: Arrivals,
@@ -61,10 +62,26 @@ class ContinuousSimulation(gym.Env):
 
     def reset(self):
         self.engine = self.generator.generate()
+        n_stations: int = self.engine.n_stations
+        max_cars: int = self.engine.max_cars
+        max_occ: int = np.max(self.engine.station_info[:,2])
         self.observation_space = Dict({
-            'stations': Box(0, np.inf, (self.engine.n_stations, 4), dtype=np.float32),
-            'cars': Box(0, np.inf, (self.engine.max_cars, 4), dtype=np.float32),
-            't': Box(0, self.engine.max_t, (1,), dtype=int)})
+            'station_locations':
+                Box(0, np.inf, (n_stations, 2), dtype=np.float32),
+            'station_occs':
+                Box(0, max_occ, (n_stations, 1), dtype=np.int32),
+            'station_maxes':
+                Box(0, max_occ, (n_stations, 1), dtype=np.int32),
+            'car_locs':
+                Box(0, np.inf, (max_cars, 2), dtype=np.float32),
+            'car_dest_idx':
+                Box(0, n_stations, (max_cars, 1), dtype=np.int32),
+            'car_dest_loc':
+                Box(0, np.inf, (max_cars, 2), dtype=np.float32),
+            't':
+                Box(0, np.inf, (1,), dtype=np.int32),
+            'query_loc':
+                Box(0, np.inf, (1, 2), dtype=np.float32)})
         self.action_space = Discrete(self.engine.n_stations)
         self.reward_range = (-1 * self.engine.max_cars, 3 * self.engine.max_cars)
 
