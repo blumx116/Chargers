@@ -119,7 +119,7 @@ city_of['haidian'] = 'beijing'
 
 
 class BoundsMapper:
-    def __init__(self, region, coordsys='bd09mc'):
+    def __init__(self, region, coordsys='gjc02'):
         bounds_dict = {
             'bd09mc' : bd09mc_region_bounds,
             'wgs84'  : wgs84_region_bounds,

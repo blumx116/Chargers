@@ -10,19 +10,15 @@ File: simulation_helper.py
 Author: bil(bil@baidu.com)
 Date: 2019/07/29 20:22:17
 """
-from typing import List, Tuple
+from typing import List
 import pandas as pd
 import numpy as np
 import copy
 from misc.utils import listify, root_dir, optional_random
-from typing import NamedTuple
-from env.load_charger_data import load_charger_data
-from env import ChargerSimulation, BoundsMapper
+from env import BoundsMapper
 from env.simulation_events import Arrivals, ArrivalEvent
-import os
+from env.internals.charger_data import lcd
 import pickle
-from wandb.util import PreInitObject as Config
-from env import ContinuousSimulation
 
 
 class SimulationHelper:
@@ -215,14 +211,13 @@ def _load_changes(daterange, region, handle_missing='replace', handle_breaking='
         returns :
     """
 
-    charger_timeseries, charger_locations = load_charger_data(daterange, region,
-                                                              handle_missing=handle_missing,
-                                                              limiting_chargers=limiting_chargers,
-                                                              force_reload=force_reload, group_stations=group_stations)
+    charger_timeseries, charger_locations = lcd(daterange, region,
+                                                handle_missing=handle_missing,
+                                                limiting_chargers=limiting_chargers,
+                                                force_reload=force_reload, group_stations=group_stations)
 
     # subset the data so we only take the part within bounds
     # this part is essentially rewriting code, should probably be refactored in the future
-    # heck, this should probably be in load_charger_data to save runtime
     locs = charger_locations[['x', 'y']].values
     bounds = BoundsMapper(region, 'gjc02')
     inrange = np.asarray([bounds.is_within_bounds(*locs[i, :]) for i in range(locs.shape[0])])
@@ -235,173 +230,6 @@ def _load_changes(daterange, region, handle_missing='replace', handle_breaking='
     return _get_changes(charger_timeseries=charger_timeseries, handle_breaking=handle_breaking), \
            charger_timeseries, charger_locations
 
-
-def make_simulation(daterange, region, n_samples, replace_ratio, sample_range,
-                    handle_missing='replace', handle_breaking='full', limiting_chargers=None, force_reload=False,
-                    group_stations=True):
-    changes, charger_timeseries, charger_locations = _load_changes(daterange, region, handle_missing, handle_breaking,
-                                                                   limiting_chargers, force_reload=False,
-                                                                   group_stations=True)
-    # don't force reload because we just called load_charger_data, load_station_data
-
-    arrival_events = _get_arrival_events(changes)
-    updated_changes = _remove_use_finish(changes, arrival_events)
-    initial_state = charger_timeseries.values[:, 0]
-    helper = SimulationHelper(charger_locations, names=charger_timeseries.index)
-    return ChargerSimulation(initial_state, updated_changes, arrival_events, 'haidian', helper, n_samples,
-                             replace_ratio, sample_range, start_date=str(daterange[0]))
-
-
-def load_day_simulation(date, region, n_samples, replace_ratio, sample_range, limiting_chargers=None,
-                        force_reload=False, group_stations=True):
-    """
-        loads a catched version of the simulation for the day
-        includes all data from the specified day and region
-        limiting_chargers is only used to subset the chargers in the model iff there is no catched simulation found
-        if no cached simulation is found, a new one is loaded and cached in "simulation_saves/YYYY-MM-DD.pickle"
-    """
-    if isinstance(date, str):
-        date = pd.to_datetime(date)
-
-    if isinstance(date, pd.Timestamp):
-        date = pd.Timestamp(year=date.year, month=date.month, day=date.day)
-
-    directory = os.path.join(root_dir, 'data', 'simulation_saves')
-    fname = _datetime_to_sim_name(date) + region
-
-    full_fname = os.path.join(directory, fname + ".pickle")
-
-    date_range = pd.date_range(date, date + pd.Timedelta(days=1), freq='h')
-    print(full_fname)
-    if not os.path.isfile(full_fname) or force_reload:
-        print("reloading")
-
-        sim = make_simulation(date_range, region, n_samples, replace_ratio, sample_range,
-                              limiting_chargers=limiting_chargers, force_reload=force_reload,
-                              group_stations=group_stations)
-
-        with open(full_fname, "wb") as f:
-            rand = sim.random
-            sim.random = None
-            # can't pickle random when random is np.random
-            pickle.dump(sim, f)
-            sim.random = optional_random()
-
-    with open(full_fname, "rb") as f:
-        sim = pickle.load(f)
-        sim.replace_ratio = replace_ratio
-        sim.n_samples = n_samples
-        sim.sample_range = sample_range
-        sim.start_date = str(date_range[0])
-        sim.random = optional_random()
-        sim.reset()
-
-        return sim
-
-
 def _datetime_to_sim_name(date):
     return "%04d-%02d-%02d" % (date.year, date.month, date.day)
 
-def load_continuous_simulation(
-        config: Config,
-        handle_missing: str = 'replace',
-        handle_breaking: str = 'full',
-        force_reload: bool = False) -> ContinuousSimulation:
-    for attr in ['car_speed', 'max_cars', 'sample_amount', 'sample_distance']:
-        assert hasattr(config, attr)
-    for attr in ['date', 'region']:
-        assert hasattr(config, attr)
-    start_date: pd.datetime = pd.to_datetime(config.date)
-
-    daterange: pd.DatetimeIndex = pd.date_range(
-        start=start_date,
-        end=start_date + pd.Timedelta(days=1),
-        freq='h')
-
-    changes, charger_timeseries, charger_locations = \
-        _load_changes(daterange, config.region,
-                      handle_missing, handle_breaking,
-                      limiting_chargers=None, force_reload=force_reload,
-                      group_stations=False)
-    # don't force reload because we just called load_charger_data, load_station_data
-
-
-    mapping: List[int] = charger_station_mapping(charger_timeseries, charger_locations)
-    # len = n_chargers
-    arrivals: Arrivals = _get_arrival_events(changes)
-    arrivals = arrivals_charger2station(arrivals, mapping)
-    departures: List[List[int]] = _get_departure_events(changes)
-    departures = departures_charger2station(departures, mapping)
-    # both: len = n_tsteps
-    initial_state: np.ndarray = occupancy_chargers2station(
-        charger_timeseries.values[:, 0], mapping)
-    max_occ: np.ndarray = max_occupancy(mapping)
-    max_occ = max_occ[:, np.newaxis]
-    # np.ndarray[int32] : [n_stations, 1]
-    assert len(max_occ) == len(initial_state)
-    locations: np.ndarray = charger_locations[['lng', 'lat']].values
-    # np.ndarray[float64] : [n_stations, 2] => (x, y)
-    station_info: np.ndarray = np.concatenate((locations, max_occ), axis=1)
-    station_info: np.ndarray = station_info.astype(np.float32)
-    # np.ndarray[float32] : [n_stations, 3] => (x, y, max_occ)
-
-    return ContinuousSimulation(
-        arrivals,
-        departures,
-        initial_state,
-        station_info,
-        config)
-
-def charger_station_mapping(
-        charger_timeseries: pd.DataFrame,
-        charger_locations: pd.DataFrame) -> List[int]:
-    return [charger_locations.index.get_loc(charger.split(":")[0]) for
-            charger in charger_timeseries.index]
-
-def arrivals_charger2station(
-        arrivals: Arrivals,
-        mapping: List[int]) -> Arrivals:
-    return [
-        [ArrivalEvent(mapping[event.idx], event.duration) for event in tstep_events]
-        for tstep_events in arrivals]
-
-def departures_charger2station(
-        departures: List[List[int]],
-        mapping: List[int]) -> List[List[int]]:
-    return [
-        [mapping[idx] for idx in tstep_departures]
-        for tstep_departures in departures]
-
-def occupancy_chargers2station(
-        initial_occupancy: np.ndarray,
-        mapping: List[int]) -> np.ndarray:
-    """
-
-    :param initial_occupancy: np.ndarray[float64] : [n_chargers, ]
-        3 indicates full, 2 indicates empty, no other values accepted
-    :param mapping: List[int]
-        the value of the ith index is the index of the station that the
-        ith charger belongs to
-    :return: np.ndarray[int32] : [n_stations,]
-        number of chargers in use at the station
-    """
-    n_stations: int = max(mapping) + 1
-    result: np.ndarray = np.zeros((n_stations, ), dtype=np.int32)
-    # np.ndarray[int32] : [n_stations,]
-    in_use: np.ndarray = (initial_occupancy == 3.)
-    # np.ndarray[bool] : [n_chargers, ]
-    for i in range(len(in_use)):
-        if in_use[i]:
-            result[mapping[i]] += 1
-    return result
-
-def max_occupancy(mapping: List[int]) -> np.ndarray:
-    """
-
-    :param mapping: List[int]
-        the value of the ith index is the index of the station that the
-        ith charger belongs to
-    :return: np.ndarray[int32] : [n_stations,]
-        number of chargers in use at the station
-    """
-    return np.unique(mapping, return_counts=True)[1].astype(np.int32)

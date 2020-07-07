@@ -9,7 +9,6 @@ from sklearn.preprocessing import normalize
 from wandb.util import PreInitObject as Config
 
 from data_structures import PriorityQueue
-
 from env.simulation_events import ArrivalEvent, QueryEvent
 
 Action = int # [range: 0 -> n_stations-1]
@@ -22,7 +21,7 @@ SimulationState = NamedTuple(
      ("car_locs", np.ndarray),  # np.ndarray[float32]: [n_stations 2 => (x, y)
      ("car_dest_idx", np.ndarray),  # np.ndarray[int32] : [n_stations, 1]
      ("car_dest_loc", np.ndarray),  # np.ndarray[float32] : [n_stations, 2] => (x, y)
-     ("t", int), # t = 0:max_t]
+     ("t", np.ndarray), # np.ndarray[int32] : (1, 1) => self.t in range[0, max_t]
      ('query_loc', np.ndarray) # np.ndarray[float32] : [1, 2] => (x,y)
      ])
 State = SimulationState
@@ -87,7 +86,8 @@ class ContinuousSimulationEngine:
         self.max_t: int = len(arrivals)
 
         if self.max_cars < self.total_queries + self.total_arrivals:
-            warnings.warn("Warning: Fill up of car slots possible")
+            # warnings.warn("Warning: Fill up of car slots possible")
+            pass
 
         self.t: int = 0
         self._cur_reward: np.ndarray = self._zero_reward_()
@@ -128,7 +128,7 @@ class ContinuousSimulationEngine:
             car_dest_idx=self.car_state[msk, 3, np.newaxis].copy(),
             car_locs=self.car_state[msk, 1:3].copy(),
             car_dest_loc=self.car_state[msk, 4:6].copy(),
-            t=self.t,
+            t=np.asarray([[self.t]]).astype(np.int32),
             query_loc=query_loc)
 
     def step(self,

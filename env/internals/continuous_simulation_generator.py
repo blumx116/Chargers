@@ -1,11 +1,12 @@
 from math import ceil
 from typing import Union, List, Tuple
+from copy import deepcopy
 
 import numpy as np
 from numpy.random import RandomState
 from wandb.util import PreInitObject as Config
 
-from .continuous_simulation_engine import ContinuousSimulationEngine
+from internals.continuous_simulation_engine import ContinuousSimulationEngine
 from env.simulation_events import ArrivalEvent, QueryEvent, Arrivals, Queries
 from misc.utils import optional_random, array_shuffle
 
@@ -61,7 +62,7 @@ class ContinuousSimulationGenerator:
         return ContinuousSimulationEngine(
             arrivals,
             queries,
-            self.departures.copy(),
+            deepcopy(self.departures),
             self.initial_station_state.copy(),
             initial_car_state,
             self.station_info.copy(),

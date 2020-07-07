@@ -169,7 +169,8 @@ def _find_in_cache(time, region, handle_missing, limiting_chargers):
 
     cache_names = _get_matching_cache_names(time, region, handle_missing)
     for name in cache_names:
-        cached_chargers = json.load(open(os.path.join(CACHE_DIR, name+LABEL_FILE_TYPE), 'r'))
+        with open(os.path.join(CACHE_DIR, name+LABEL_FILE_TYPE), 'r') as f:
+            cached_chargers = json.load(f)
         if cached_chargers == limiting_chargers:
            return name
     return None
@@ -196,8 +197,8 @@ def _load_from_cache(time, region, handle_missing, limiting_chargers):
     if matched_file is None:
         return None
     else:
-        return pickle.load(open(os.path.join(CACHE_DIR, matched_file + CACHE_FILE_TYPE), 'rb'))
-
+        with open(os.path.join(CACHE_DIR, matched_file + CACHE_FILE_TYPE), 'rb') as f:
+            return pickle.load(f)
 def _map_location_to_stations(locations, region):
     """
         Returns a dictionary with keys being grid tiles and a list of station names
@@ -282,7 +283,7 @@ def _group_stations(charger_data, region):
     return ChargerData(ts, locs)
 
 
-def load_charger_data(time, region, handle_missing='erase', limiting_chargers=None, 
+def lcd(time, region, handle_missing='erase', limiting_chargers=None,
         force_reload=False, group_stations=False):
     if not force_reload: 
         in_cache = _find_in_cache(time, region, handle_missing, limiting_chargers) is not None
