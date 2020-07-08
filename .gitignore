@@ -1,3 +1,4 @@
 data/
 wandb/
 .idea/
+/minimal_dqn/

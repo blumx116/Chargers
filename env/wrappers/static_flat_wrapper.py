@@ -8,7 +8,7 @@ import numpy as np
 from env import ContinuousSimulation, State
 
 
-class StaticFlatWrapper(gym.core.ObservationWrapper):
+class StaticFlatWrapper(gym.core.ObservationWrapper, ContinuousSimulation):
     def __init__(self,
             env: ContinuousSimulation):
         super().__init__(env)

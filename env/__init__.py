@@ -4,3 +4,4 @@ from .continuous_simulation import (
     ContinuousSimulation, State, Action, Reward, load_continuous_simulation)
 from internals import *
 from wrappers import *
+from make_env import make_and_wrap_env

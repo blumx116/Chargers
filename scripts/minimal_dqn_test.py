@@ -6,14 +6,14 @@ import numpy as np
 import torch
 import torch.nn as nn
 import torch.optim as optim
-torch.manual_seed(0)
+torch.manual_seed(1)
 torch.backends.cudnn.deterministic = True
 torch.backends.cudnn.benchmark = False
-np.random.seed(0)
-from misc.utils import listify
+np.random.seed(1)
+
 from env import load_continuous_simulation
 from env.wrappers import SummedRewardWrapper, StaticFlatWrapper, NormalizedPositionWrapper
-from agent import make_model
+from agent.dqn import make_model
 import wandb
 
 warnings.simplefilter('once')
@@ -53,7 +53,7 @@ sim = NormalizedPositionWrapper(sim)
 sim = StaticFlatWrapper(sim)
 
 sim = SummedRewardWrapper(sim)
-sim.seed(0)
+sim.seed(1)
 sim.reset()
 
 i = 0

@@ -1,1 +1,2 @@
-from make_model import make_model
+from .agent import Agent
+from .diagnostic import diagnostic

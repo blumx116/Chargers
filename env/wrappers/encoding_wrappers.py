@@ -1,4 +1,5 @@
 from copy import copy
+from typing import Union
 
 import gym
 from gym.spaces import Dict, Box, Space
@@ -14,17 +15,20 @@ class PositionalEncoder:
         self.dim: int = dim
         frequencies: np.ndarray = np.arange(0, self.dim / 2)
         frequencies = 2 * frequencies / dim
-        frequencies = np.power(50, frequencies)
+        frequencies = np.power(100, frequencies)
         self.frequencies: np.ndarray = 1 / frequencies
 
-    def encode(self, val: float) -> np.ndarray:
+    def encode(self, val: Union[float, np.ndarray]) -> np.ndarray:
         """
         see: https://kazemnejad.com/blog/transformer_architecture_positional_encoding/
-        :param val: the value (preferably between 0 and 50) to encode
+        :param val: the value (preferably between 0 and 100) to encode
+            if is float, is reshaped to np.ndarray[1,]
         :return: np.ndarray[float32] : [1, dim/ 2]
         """
-        sines: np.ndarray = np.sin(val * self.frequencies)[np.newaxis, :]
-        coses: np.ndarray = np.cos(val * self.frequencies)[np.newaxis, :]
+        if isinstance(val, float):
+            val: np.ndarray = np.asarray(val).astype(np.float32).reshape((1,))
+        sines: np.ndarray = np.sin(np.outer(val, self.frequencies))
+        coses: np.ndarray = np.cos(np.outer(val, self.frequencies))
         # both np.ndarray[float32] : [1, dim / 2]
         return np.concatenate((sines, coses), axis=1).astype(np.float32)
 
@@ -46,7 +50,7 @@ class TimeEncodingWrapper(gym.core.ObservationWrapper, ContinuousSimulation):
         self.observation_space: Dict = Dict(spaces)
 
     def observation(self, observation: State):
-        state = State(
+        return State(
             observation.station_locations,
             observation.station_occs,
             observation.station_maxes,
@@ -78,7 +82,7 @@ class PositionEncodingWrapper(gym.core.ObservationWrapper, ContinuousSimulation)
         :return: np.ndarray[float32] : [1, self.dimension * 2]
         """
         return np.concatenate(
-            (self.encoder.encode(loc[0]), self.encoder.encode(loc[1])),
+            (self.encoder.encode(loc[:, 0]), self.encoder.encode(loc[:, 1])),
             axis=1)
 
     def observation(self, observation: State):

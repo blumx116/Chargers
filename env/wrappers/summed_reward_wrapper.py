@@ -6,7 +6,8 @@ from env import Reward as OldReward
 
 Reward = float
 
-class SummedRewardWrapper(gym.core.RewardWrapper):
+
+class SummedRewardWrapper(gym.core.RewardWrapper, ContinuousSimulation):
     def __init__(self,
             env: ContinuousSimulation):
         super().__init__(env)

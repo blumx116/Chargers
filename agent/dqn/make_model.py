@@ -19,7 +19,7 @@ def FeedforwardModel(
     for idx, (in_d, out_d) in enumerate(zip(ins, outs)):
         layers.append(nn.Linear(in_d, out_d))
         layers.append(nn.ReLU())
-        if normalize and idx != (len(outs) -1):
+        if normalize and idx != (len(outs) - 1):
             # don't normalize last output
             layers.append(nn.LayerNorm(out_d))
 
@@ -41,24 +41,26 @@ class TransformerModel(nn.Module):
         self.station_encoder: nn.Module = nn.Linear(station_dims, n_nodes)
         self.transformer: nn.Module = nn.Transformer(
             d_model=n_nodes,
-            dim_feedforward=n_nodes * n_heads / 2,
+            dim_feedforward=int(n_nodes * n_heads / 2),
             num_decoder_layers=n_layers,
             num_encoder_layers=n_layers,
             nhead=n_heads)
         self.linear_activation: nn.Module = nn.Linear(n_nodes, 1)
 
-    def forward(self, cars: torch.Tensor, stations: torch.Tensor) -> torch.Tensor:
+    def forward(self, stations: torch.Tensor, cars: torch.Tensor) -> torch.Tensor:
         """
 
         :param cars: torch.Tensor[f32]: (batch_dim, n_cars, car_dims)
         :param stations: torch.Tensor[f32]: (batch_dim, n_cars, car_dims)
         :return: stations: torch.Tensor[f32]: (batch_dim, n_stations, 1)
         """
-        cars = self.car_encoder(cars) # (batch_dim, n_cars, embed_dim)
-        stations = self.station_encoder(stations) # (batch_dim, n_stations, embed_dim)
-        transformed = self.transformer(cars, stations) # (batch_dim, n_stations, embed_dim)
-        values = self.linear_activation(transformed) # (batch_dim, n_stations, 1)
-        return values.squeeze(2) # (batch_dim, n_stations)
+        cars: torch.Tensor = self.car_encoder(cars)  # (batch_dim, n_cars, embed_dim)
+        stations: torch.Tensor = self.station_encoder(stations)  # (batch_dim, n_stations, embed_dim)
+        cars = cars.permute(1, 0, 2)  # (n_cars, batch_dim, embed_dim)
+        stations = cars.permute(1, 0, 2)  # (n_stations, batch_dim, embed_dim)
+        transformed = self.transformer(cars, stations)  # (batch_dim, n_stations, embed_dim)
+        values = self.linear_activation(transformed)  # (batch_dim, n_stations, 1)
+        return values.squeeze(2)  # (batch_dim, n_stations)
 
 
 def make_model(config: Config, observation_space: Space, action_space: Space) -> nn.Module:
@@ -72,6 +74,6 @@ def make_model(config: Config, observation_space: Space, action_space: Space) ->
     if model == 'transformer':
         assert isinstance(observation_space, Dict)
         assert 'cars' in observation_space.spaces and 'stations' in observation_space.spaces
-        car_dims: int = observation_space['cars'].shape[0]
-        station_dims: int = observation_space['stations'].shape[0]
+        car_dims: int = observation_space['cars'].shape[1]
+        station_dims: int = observation_space['stations'].shape[1]
         return TransformerModel(car_dims, station_dims, n_actions, config.n_layers, config.n_nodes, config.n_heads, config.normalize)
