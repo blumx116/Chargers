@@ -26,7 +26,7 @@ wandb.config.update({
     'model': 'transformer',
     'n_layers': 2,
     'n_heads': 4,
-    'n_nodes' : 1000,
+    'n_nodes' : 8,
     'normalize': True,
     'max_cars': 100,
     'car_speed': 0.1,
@@ -37,7 +37,8 @@ wandb.config.update({
     'learning_rate': 1e-5,
     'replay_size': 100000,
     'target_network_update_f': 10000,
-    'log_every': 10000,
+    'log_every': 10
+    'diagnostic_every': 1000,
     'gamma': 0.99,
     'start_train_ts': 1000,
     'batch_size': 32,

@@ -33,6 +33,7 @@ class DQNAgent(Agent):
         self.random: RandomState = optional_random(random)
         self.dtype = torch.cuda.FloatTensor if self.device.type == 'cuda' else torch.FloatTensor
         self.dtypelong = torch.cuda.LongTensor if self.device.type == 'cuda' else torch.LongTensor
+        self.loss = nn.MSELoss()
 
     def _convert_state(self, state: np.ndarray) -> torch.Tensor:
         return torch.tensor(np.float32(state)).type(self.dtype)
@@ -40,11 +41,9 @@ class DQNAgent(Agent):
     def q_value(self,
             state: Union[State, np.ndarray],
             network: nn.Module) -> torch.Tensor:
-        if isinstance(state, list):
+        if isinstance(state, list) or isinstance(state, tuple):
             state = list(map(self._convert_state, state))
             return network.forward(*state)
-        elif isinstance(state, np.ndarray) and state.dtype == object:
-            state = list()
         else:
             state = self._convert_state(state)
             return network.forward(state)
@@ -124,19 +123,23 @@ class DQNAgent(Agent):
         done = torch.tensor(done).type(self.dtype)
 
         # Normal DDQN update
-        q_values = self.q_value(state, self.q_network)
+        q_values = self.q_value(state, self.q_network)  # (n_stations=actions, batch_size)
         # q_values = self.q_network(state)
+        q_values = q_values.permute(1, 0)  # (batch_size, n_stations)
         q_value = q_values.gather(1, action.unsqueeze(1)).squeeze(1)
         # double q-learning
-        online_next_q_values = self.q_value(self.q_network, next_state)
+        online_next_q_values = self.q_value(next_state, self.q_network)
         # online_next_q_values = self.q_network(next_state)
-        _, max_indicies = torch.max(online_next_q_values, dim=1)
+        _, max_indices = torch.max(online_next_q_values, dim=0)
         target_q_values = self.q_value(next_state, self.target_q_network)
+        # (n_stations, batch_size)
         # target_q_values = self.target_q_network(next_state)
-        next_q_value = torch.gather(target_q_values, 1, max_indicies.unsqueeze(1))
+        target_q_values = target_q_values.permute(1, 0)
+        # (batch_size, n_stations)
+        next_q_value = torch.gather(target_q_values, 1, max_indices.unsqueeze(1))
 
         expected_q_value = reward + gamma * next_q_value.squeeze() * (1 - done)
-        loss = (q_value - expected_q_value.data).pow(2).mean()
+        loss = self.loss(q_value, expected_q_value)
         if optimizer is not None:
             optimizer.zero_grad()
             loss.backward()

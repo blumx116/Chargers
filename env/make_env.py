@@ -25,5 +25,6 @@ def make_and_wrap_env(config: Config) -> ContinuousSimulation:
         sim = TimeEncodingWrapper(sim, dimension=10)
         sim = OneHotIndexWrapper(sim)
         sim = AttentionModelWrapper(sim)
+        sim = SummedRewardWrapper(sim)
         return sim
 

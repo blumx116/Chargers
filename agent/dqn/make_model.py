@@ -57,7 +57,7 @@ class TransformerModel(nn.Module):
         cars: torch.Tensor = self.car_encoder(cars)  # (batch_dim, n_cars, embed_dim)
         stations: torch.Tensor = self.station_encoder(stations)  # (batch_dim, n_stations, embed_dim)
         cars = cars.permute(1, 0, 2)  # (n_cars, batch_dim, embed_dim)
-        stations = cars.permute(1, 0, 2)  # (n_stations, batch_dim, embed_dim)
+        stations = stations.permute(1, 0, 2)  # (n_stations, batch_dim, embed_dim)
         transformed = self.transformer(cars, stations)  # (batch_dim, n_stations, embed_dim)
         values = self.linear_activation(transformed)  # (batch_dim, n_stations, 1)
         return values.squeeze(2)  # (batch_dim, n_stations)
