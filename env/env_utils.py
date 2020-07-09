@@ -1,6 +1,8 @@
 import numpy as np
 
+from env import State
+
 def get_distances(
-        cars: np.ndarray,
+        query: np.ndarray,
         stations: np.ndarray) -> np.ndarray:
-    stations
+    return np.linalg.norm(stations - query, axis=1)
