@@ -51,14 +51,15 @@ class TimeEncodingWrapper(gym.core.ObservationWrapper, ContinuousSimulation):
 
     def observation(self, observation: State):
         return State(
-            observation.station_locations,
-            observation.station_occs,
-            observation.station_maxes,
-            observation.car_locs,
-            observation.car_dest_idx,
-            observation.car_dest_loc,
-            self.encoder.encode(observation.t),
-            observation.query_loc)
+            station_locations=observation.station_locations,
+            station_occs=observation.station_occs,
+            station_maxes=observation.station_maxes,
+            car_locs=observation.car_locs,
+            car_dest_idx=observation.car_dest_idx,
+            car_dest_loc=observation.car_dest_loc,
+            t=self.encoder.encode(observation.t),
+            query_loc=observation.query_loc,
+            remaining_queries=observation.remaining_queries)
 
 
 class PositionEncodingWrapper(gym.core.ObservationWrapper, ContinuousSimulation):
@@ -87,11 +88,12 @@ class PositionEncodingWrapper(gym.core.ObservationWrapper, ContinuousSimulation)
 
     def observation(self, observation: State):
         return State(
-            self._encode_loc(observation.station_locations),
-            observation.station_occs,
-            observation.station_maxes,
-            self._encode_loc(observation.car_locs),
-            observation.car_dest_idx,
-            self._encode_loc(observation.car_dest_loc),
-            observation.t,
-            self._encode_loc(observation.query_loc))
+            station_locations=self._encode_loc(observation.station_locations),
+            station_occs=observation.station_occs,
+            station_maxes=observation.station_maxes,
+            car_locs=self._encode_loc(observation.car_locs),
+            car_dest_idx=observation.car_dest_idx,
+            car_dest_loc=self._encode_loc(observation.car_dest_loc),
+            t=observation.t,
+            query_loc=self._encode_loc(observation.query_loc),
+            remaining_queries=observation.remaining_queries)

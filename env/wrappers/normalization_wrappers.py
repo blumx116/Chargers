@@ -49,7 +49,8 @@ class NormalizedPositionWrapper(gym.core.ObservationWrapper, ContinuousSimulatio
             car_dest_idx=observation.car_dest_idx,
             car_dest_loc=self._normalize_loc_(observation.car_dest_loc),
             t=observation.t,
-            query_loc=self._normalize_loc_(observation.query_loc))
+            query_loc=self._normalize_loc_(observation.query_loc),
+            remaining_queries=observation.remaining_queries)
 
 
 class NormalizedTimeWrapper(gym.core.ObservationWrapper, ContinuousSimulation):
@@ -78,4 +79,5 @@ class NormalizedTimeWrapper(gym.core.ObservationWrapper, ContinuousSimulation):
             car_dest_idx=observation.car_dest_idx,
             car_dest_loc=observation.car_dest_loc,
             t=new_t,
-            query_loc=observation.query_loc)
+            query_loc=observation.query_loc,
+            remaining_queries=observation.remaining_queries)

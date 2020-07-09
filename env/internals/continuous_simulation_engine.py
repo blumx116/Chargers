@@ -21,8 +21,9 @@ SimulationState = NamedTuple(
      ("car_locs", np.ndarray),  # np.ndarray[float32]: [n_stations 2 => (x, y)
      ("car_dest_idx", np.ndarray),  # np.ndarray[int32] : [n_stations, 1]
      ("car_dest_loc", np.ndarray),  # np.ndarray[float32] : [n_stations, 2] => (x, y)
-     ("t", np.ndarray), # np.ndarray[int32] : (1, 1) => self.t in range[0, max_t]
-     ('query_loc', np.ndarray) # np.ndarray[float32] : [1, 2] => (x,y)
+     ("t", np.ndarray),  # np.ndarray[int32] : (1, 1) => self.t in range[0, max_t]
+     ('query_loc', np.ndarray),  # np.ndarray[float32] : [1, 2] => (x,y)
+     ('remaining_queries', np.ndarray)  # np.ndarray[int32] : [1, 1] => num_remaining_queries
      ])
 State = SimulationState
 
@@ -129,7 +130,8 @@ class ContinuousSimulationEngine:
             car_locs=self.car_state[msk, 1:3].copy(),
             car_dest_loc=self.car_state[msk, 4:6].copy(),
             t=np.asarray([[self.t]]).astype(np.int32),
-            query_loc=query_loc)
+            query_loc=query_loc,
+            remaining_queries=np.asarray([[len(self._cur_queries_())]]).astype(np.int32))
 
     def step(self,
              action: Action = None) -> Tuple[State, Reward, bool, int]:

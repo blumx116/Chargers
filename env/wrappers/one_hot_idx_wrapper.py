@@ -33,4 +33,5 @@ class OneHotIndexWrapper(gym.core.ObservationWrapper, ContinuousSimulation):
             car_dest_idx=indices,
             car_locs=observation.car_locs,
             query_loc=observation.query_loc,
-            t=observation.t)
+            t=observation.t,
+            remaining_queries=observation.remaining_queries)

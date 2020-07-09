@@ -59,6 +59,7 @@ class ContinuousSimulation(gym.Env):
         self.action_space: Space = ...
         self.reward_range: Tuple[float, float] = ...
         self.config: Config = config
+
         self.reset()
 
     def reset(self):
@@ -82,7 +83,9 @@ class ContinuousSimulation(gym.Env):
             't':
                 Box(0, np.inf, (1, 1), dtype=np.int32),
             'query_loc':
-                Box(0, np.inf, (1, 2), dtype=np.float32)})
+                Box(0, np.inf, (1, 2), dtype=np.float32),
+            'remaining_queries':
+                Box(0, np.inf, (1, 1), dtype=np.int32)})
         self.action_space = Discrete(self.engine.n_stations)
         self.reward_range = (-1 * self.engine.max_cars, 3 * self.engine.max_cars)
         return self.state()

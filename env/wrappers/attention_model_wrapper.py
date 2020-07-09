@@ -55,7 +55,8 @@ class AttentionModelWrapper(gym.core.ObservationWrapper, ContinuousSimulation):
         stations = np.concatenate(
             (stations,
              np.repeat(observation.t, n_stations, axis=0),
-             np.repeat(observation.query_loc, n_stations, axis=0)),
+             np.repeat(observation.query_loc, n_stations, axis=0),
+             np.repeat(observation.remaining_queries, n_stations, axis=0)),
             axis=1)
         # append time to each stations' input
         # np.ndarray[float32] : [n_stations, 7]
