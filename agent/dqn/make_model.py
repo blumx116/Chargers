@@ -58,9 +58,9 @@ class TransformerModel(nn.Module):
         stations: torch.Tensor = self.station_encoder(stations)  # (batch_dim, n_stations, embed_dim)
         cars = cars.permute(1, 0, 2)  # (n_cars, batch_dim, embed_dim)
         stations = stations.permute(1, 0, 2)  # (n_stations, batch_dim, embed_dim)
-        transformed = self.transformer(cars, stations)  # (batch_dim, n_stations, embed_dim)
-        values = self.linear_activation(transformed)  # (batch_dim, n_stations, 1)
-        return values.squeeze(2)  # (batch_dim, n_stations)
+        transformed = self.transformer(cars, stations)  # (n_stations, batch_dim, embed_dim)
+        values = self.linear_activation(transformed)  # (n_stations, batch_dim, 1)
+        return values.squeeze(2).permute(1,0)  # (batch_dim, n_stations)
 
 
 def make_model(config: Config, observation_space: Space, action_space: Space) -> nn.Module:

@@ -23,7 +23,7 @@ wandb.init(project='chargers')
 
 wandb.config.update({
     'algorithm': 'basic dqn',
-    'model': 'transformer',
+    'model': 'feedforward',
     'n_layers': 2,
     'n_heads': 4,
     'n_nodes' : 8,
@@ -37,7 +37,7 @@ wandb.config.update({
     'learning_rate': 1e-5,
     'replay_size': 100000,
     'target_network_update_f': 10000,
-    'log_every': 10
+    'log_every': 10,
     'diagnostic_every': 1000,
     'gamma': 0.99,
     'start_train_ts': 1000,
@@ -51,6 +51,7 @@ wandb.config.update({
 config = wandb.config
 
 from agent.dqn import DQNAgent, make_model
+from agent.diagnostic import train
 from env import make_and_wrap_env
 
 sim = make_and_wrap_env(config)
@@ -60,4 +61,4 @@ q_target = deepcopy(q_model)
 
 agent = DQNAgent(q_model, q_model, sim, config, device=torch.device('cuda:0'), random=0)
 
-agent.train(config)
+train(agent, sim, config)

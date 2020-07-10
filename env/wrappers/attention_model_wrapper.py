@@ -28,6 +28,7 @@ class AttentionModelWrapper(gym.core.ObservationWrapper, ContinuousSimulation):
                 car_dims += n_features(dim)
         station_dims += n_features('query_loc')
         station_dims += n_features('t')
+        station_dims += n_features('remaining_queries')
         car_dims += n_features('t')
         self.n_stations: int = og_space['station_locations'].shape[0]
         self.max_cars: int = og_space['car_locs'].shape[0]

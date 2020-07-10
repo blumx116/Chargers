@@ -1,4 +1,4 @@
-from typing import Iterable, List
+from typing import Iterator, List, Callable
 
 import numpy as np
 import wandb
@@ -13,7 +13,7 @@ def diagnostic(
         agent: Agent,
         env: ContinuousSimulation,
         config: Config,
-        seeds: Iterable[int] = None) -> None:
+        seeds: Iterator[int] = None) -> None:
     if seeds is None:
         seeds = range(0, 10)
     seed = next(seeds, None)
@@ -46,3 +46,44 @@ def diagnostic(
     wandb.log({'Reward': np.mean(rewards)})
     if hasattr(agent, 'compute_td_loss'):
         wandb.log({'Loss': np.mean(losses)})
+
+def train(agent: Agent,
+          env: ContinuousSimulation,
+          config: Config,
+          env_seeds: Iterator[int] = None,
+          test: Callable[[Agent], None] = None) -> None:
+    episode_reward = 0
+
+    if env_seeds is not None:
+        env.seed(next(env_seeds))
+    state = env.reset()
+    context = env.unwrapped.state()
+
+    n_eps_completed: int = 0
+    for ts in range(1, config.max_ts + 1):
+        action = agent.act(state, context, mode='train', network='q')
+
+        next_state, reward, done, _ = env.step(int(action.cpu()))
+        next_context = env.unwrapped.state()
+
+        agent.remember(state, context, action, reward,
+                       next_state, next_context, done)
+
+        if done:
+            n_eps_completed += 1
+            state = env.reset()
+            if env_seeds is not None:
+                env.seed(next(env_seeds))
+
+        agent.optimize()
+        agent.step(ts)
+
+        if ts % config.log_every == 0:
+            wandb.log({
+                'global timestep': ts,
+                'num updates' : int(ts / config.target_network_update_freq),
+                'num episdoes' : n_eps_completed})
+            agent.log(ts)
+
+        if ts % config.test_every == 0 and test is not None:
+            test(agent)
