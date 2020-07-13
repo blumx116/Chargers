@@ -5,7 +5,6 @@ from gym.spaces import Space, Dict, Discrete, Box
 import numpy as np
 from numpy.random import RandomState
 import pandas as pd
-from wandb.util import PreInitObject as Config
 
 from env.internals.continuous_simulation_engine import (
     ContinuousSimulationEngine, Reward, Action, State)
@@ -13,6 +12,7 @@ from env.internals.continuous_simulation_generator import ContinuousSimulationGe
 from env.internals.simulation_helper import (
     _load_changes, _get_arrival_events, _get_departure_events)
 from env.simulation_events import Arrivals, ArrivalEvent
+from misc.config import Config
 
 
 class ContinuousSimulation(gym.Env):

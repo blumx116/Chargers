@@ -4,7 +4,9 @@ from gym.spaces import Space, Discrete, Box, Dict
 import torch
 import torch.nn as nn
 import numpy as np
-from wandb.util import PreInitObject as Config
+
+from misc.config import Config
+
 
 def FeedforwardModel(
         in_dims: int,

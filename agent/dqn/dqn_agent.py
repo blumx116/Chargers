@@ -6,13 +6,14 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 import wandb
-from wandb.util import PreInitObject as Config
 
 from agent import Agent
 from agent.dqn import ReplayBuffer
 from env import ContinuousSimulation, State
+from misc.config import Config
 from misc.utils import optional_random
 from minimal_dqn.main import get_epsilon, hard_update
+
 
 class DQNAgent(Agent):
     def __init__(self,
@@ -41,7 +42,7 @@ class DQNAgent(Agent):
     def act(self,
             observation: Union[State, np.ndarray, Tuple],
             context: Any,
-            mode: str ='test',
+            mode: str = 'test',
             network: str = 'q'):
         if isinstance(observation, tuple):
             state = tuple(map(self._add_batch_dim, observation))

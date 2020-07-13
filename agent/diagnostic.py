@@ -2,12 +2,11 @@ from typing import Iterator, List, Callable
 
 import numpy as np
 import wandb
-from wandb.util import PreInitObject as Config
 
 from agent import Agent
 from agent.dqn import ReplayBuffer
 from env import ContinuousSimulation
-
+from misc.config import Config, log
 
 def diagnostic(
         agent: Agent,
@@ -20,7 +19,6 @@ def diagnostic(
 
     rewards: List[float] = []
     losses: List[float] = []
-
 
     while seed is not None:
         env.seed(0)
@@ -43,9 +41,9 @@ def diagnostic(
             loss = agent.compute_td_loss(50, replay_buffer, None, config.gamma)
             losses.append(loss.data)
 
-    wandb.log({'Reward': np.mean(rewards)})
+    log({'Reward': np.mean(rewards)})
     if hasattr(agent, 'compute_td_loss'):
-        wandb.log({'Loss': np.mean(losses)})
+        log({'Loss': np.mean(losses)})
 
 def train(agent: Agent,
           env: ContinuousSimulation,
@@ -79,10 +77,10 @@ def train(agent: Agent,
         agent.step(ts)
 
         if ts % config.log_every == 0:
-            wandb.log({
-                'global timestep': ts,
-                'num updates' : int(ts / config.target_network_update_freq),
-                'num episdoes' : n_eps_completed})
+            log(config,
+                { 'global timestep': ts,
+                'num updates': int(ts / config.target_network_update_freq),
+                'num episodes': n_eps_completed})
             agent.log(ts)
 
         if ts % config.test_every == 0 and test is not None:

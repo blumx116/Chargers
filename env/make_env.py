@@ -1,5 +1,3 @@
-from wandb.util import PreInitObject as Config
-
 from env import ContinuousSimulation, load_continuous_simulation
 from env.wrappers import (
     PositionEncodingWrapper,
@@ -9,6 +7,7 @@ from env.wrappers import (
     TimeEncodingWrapper,
     AttentionModelWrapper,
     OneHotIndexWrapper)
+from misc.config import Config
 
 
 def make_and_wrap_env(config: Config) -> ContinuousSimulation:
