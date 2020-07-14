@@ -12,7 +12,7 @@ from env.internals.continuous_simulation_generator import ContinuousSimulationGe
 from env.internals.simulation_helper import (
     _load_changes, _get_arrival_events, _get_departure_events)
 from env.simulation_events import Arrivals, ArrivalEvent
-from misc.config import Config
+from misc.utils import kwargify
 
 
 class ContinuousSimulation(gym.Env):
@@ -21,7 +21,11 @@ class ContinuousSimulation(gym.Env):
                  departures: List[List[int]],
                  initial_station_state: np.ndarray,
                  station_info: np.ndarray,
-                 config: Config):
+                 sample_distance: float,
+                 sample_amount: Union[float, int],
+                 max_cars: int,
+                 car_speed: float,
+                 **kwargs):
         """
 
         :param arrivals: List[List[ArrivalEvents]]: [max_t, ]
@@ -36,29 +40,33 @@ class ContinuousSimulation(gym.Env):
         :param station_info: np.ndarray[float] : [n_stations, 3]
             idx => (x, y, max_occupancy)
             information about each station, indexed by rows
-        :param config:other configurations for the simulation
-            config.sample_distance: float => samples are generated around arrival event
-                with range Normal(0, sample_distance)
-            config.sample_amount: Union[float, int]
-                int => generates this many queries
-                float => turns this percentage of arrivals in to queries
-            config.max_cars: int
-                the number of slots to allocate for holding car data
-            config.car_speed: float => how far each car moves towards destination
-                at each timestep
+        :param sample_distance: float
+            samples are generated around arrival event
+            with range Normal(0, sample_distance)
+        :param sample_amount: Union[float, int]
+            int => generates this many queries
+            float => turns this percentage of arrivals in to queries
+        :param max_cars: int
+            the number of slots to allocate for holding car data
+        :param car_speed: float
+            how far each car moves towards destination at each timestep
+        :param kwargs: for compatibility
         """
         self.generator: ContinuousSimulationGenerator = ContinuousSimulationGenerator(
-            arrivals,
-            departures,
-            initial_station_state,
-            station_info,
-            config)
+            arrivals=arrivals,
+            departures=departures,
+            initial_station_state=initial_station_state,
+            station_info=station_info,
+            sample_distance=sample_distance,
+            sample_amount=sample_amount,
+            max_cars=max_cars,
+            car_speed=car_speed,
+            **kwargs)
 
         self.engine: ContinuousSimulationEngine = ...
         self.observation_space: Space = ...
         self.action_space: Space = ...
         self.reward_range: Tuple[float, float] = ...
-        self.config: Config = config
 
         self.reset()
 
@@ -110,15 +118,18 @@ class ContinuousSimulation(gym.Env):
 
 
 def load_continuous_simulation(
-        config: Config,
+        date: str,
+        car_speed: float,
+        max_cars: int,
+        sample_amount: int,
+        sample_distance: float,
+        region: str,
         handle_missing: str = 'replace',
         handle_breaking: str = 'full',
-        force_reload: bool = False) -> ContinuousSimulation:
-    for attr in ['car_speed', 'max_cars', 'sample_amount', 'sample_distance']:
-        assert hasattr(config, attr)
-    for attr in ['date', 'region']:
-        assert hasattr(config, attr)
-    start_date: pd.datetime = pd.to_datetime(config.date)
+        force_reload: bool = False,
+        **kwargs) -> ContinuousSimulation:
+    kwargs = kwargify(locals())
+    start_date: pd.datetime = pd.to_datetime(date)
 
     daterange: pd.DatetimeIndex = pd.date_range(
         start=start_date,
@@ -126,7 +137,7 @@ def load_continuous_simulation(
         freq='h')
 
     changes, charger_timeseries, charger_locations = \
-        _load_changes(daterange, config.region,
+        _load_changes(daterange, region,
                       handle_missing, handle_breaking,
                       limiting_chargers=None, force_reload=force_reload,
                       group_stations=False)
@@ -155,7 +166,7 @@ def load_continuous_simulation(
         departures,
         initial_state,
         station_info,
-        config)
+        **kwargs)
 
 
 def charger_station_mapping(

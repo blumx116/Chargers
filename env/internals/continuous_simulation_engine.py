@@ -6,7 +6,6 @@ from gym.spaces import Space
 import numpy as np
 from numpy.random import RandomState
 from sklearn.preprocessing import normalize
-from wandb.util import PreInitObject as Config
 
 from data_structures import PriorityQueue
 from env.simulation_events import ArrivalEvent, QueryEvent
@@ -27,6 +26,7 @@ SimulationState = NamedTuple(
      ])
 State = SimulationState
 
+
 class ContinuousSimulationEngine:
     def __init__(self,
             arrivals: List[List[ArrivalEvent]],
@@ -35,7 +35,8 @@ class ContinuousSimulationEngine:
             initial_station_state: np.ndarray,
             initial_car_state: np.ndarray,
             station_info: np.ndarray,
-            config: Config):
+            car_speed: float,
+            **kwargs):
         """
 
         :param arrivals: List[List[ArrivalEvents]]: [max_t, ]
@@ -56,14 +57,14 @@ class ContinuousSimulationEngine:
         :param station_info: np.ndarray[float32] : [n_stations, 3]
             idx => (x, y, max_occupancy)
             information about each station, indexed by rows
-        :param config:other configurations for the simulation
-            config.car_speed: float => how far each car moves towards destination
-                at each timestep
+        :param car_speed: float
+            how far each car moves towards destination at each timestep
+        :param kwargs: for compatibility
         """
         assert len(arrivals) == len(queries)
         assert np.all(station_info[:, 2] > 0)  # all stations have spots
 
-        self.car_speed: float = config.car_speed
+        self.car_speed: float = car_speed
 
         self.arrivals: List[List[ArrivalEvent]] = arrivals
         self.queries: List[List[QueryEvent]] = queries

@@ -10,9 +10,20 @@ from misc.utils import optional_random, array_random_choice
 class ReplayBuffer(object):
     def __init__(self,
             capacity: int,
-            random: Union[int, RandomState]):
-        self.buffer: deque = deque(maxlen=capacity)
-        self.capacity: int =  capacity
+            random: Union[int, RandomState] = None,
+            **kwargs):
+        """
+        :param capacity: int
+            number of replay transitions to hold
+        :param (optional) random: Union[int, RandomState]
+            random seed to use
+            defaults to global numpy random
+        :param kwargs: for compatibility
+        """
+        self.capacity: int = capacity
+        self.buffer: deque = deque(maxlen=self.capacity)
+
+        random: Union[int, RandomState, None] = random
         self.random: RandomState = optional_random(random)
 
     def push(self, state, context, action, reward,

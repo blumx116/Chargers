@@ -9,9 +9,11 @@ from env import BoundsMapper, ContinuousSimulation, State
 class NormalizedPositionWrapper(gym.core.ObservationWrapper, ContinuousSimulation):
     def __init__(self,
             env: ContinuousSimulation,
+            region: str,
             normalize_offset: bool = True,
             normalize_scale: bool = True,
-            scale: float = 1):
+            scale: float = 1,
+            **kwargs):
         super().__init__(env)
         self._normalize_offset: bool = normalize_offset
         if normalize_scale:
@@ -19,7 +21,7 @@ class NormalizedPositionWrapper(gym.core.ObservationWrapper, ContinuousSimulatio
         self._normalize_scale: bool = normalize_scale
         self.scale: float = scale
 
-        region: str = self.env.config.region
+        region: str = region
         mapper = BoundsMapper(region, coordsys='gjc02')
         self._map_offset: np.ndarray = np.asarray(
             (mapper.bounds['left'], mapper.bounds['bottom'])).astype(np.float32)

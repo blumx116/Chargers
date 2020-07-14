@@ -5,9 +5,6 @@ import torch
 import torch.nn as nn
 import numpy as np
 
-from misc.config import Config
-
-
 def FeedforwardModel(
         in_dims: int,
         n_layers: int,
@@ -65,17 +62,60 @@ class TransformerModel(nn.Module):
         return values.squeeze(2).permute(1,0)  # (batch_dim, n_stations)
 
 
-def make_model(config: Config, observation_space: Space, action_space: Space) -> nn.Module:
+def make_model(
+        action_space: Space,
+        observation_space: Space,
+        model: str,
+        device: torch.device,
+        n_nodes: int,
+        n_layers: int,
+        normalize: bool = True,
+        n_heads: int = 1,
+        **kwargs) -> nn.Module:
+    """
+
+    :param action_space: Space (Discrete)
+        Used to calculate the shape of model output
+    :param observation_space: Space (see model)
+        Used to calculate the shape of model input
+    :param model: str
+        one of [feedforward, transformer]
+        Type of model to make
+    :param device: torch.device
+        device to put the model on
+    :param n_nodes: int
+        number of nodes per layer (or per head)
+    :param n_layers: int
+        number of layers
+    :param normalize: bool
+        whether or not to use LayerNorm
+    :param n_heads: int
+        number of heads to use (if model uses attention)
+    :param kwargs:
+        for compatibility
+    :return: nn.Module
+        see docs for individual modules for input
+    """
+    action_space: Space = action_space
+    observation_space: Space = observation_space
     assert isinstance(action_space, Discrete)
     n_actions: int = action_space.n
-    model: str = config.model.lower()
+    model: str = model.lower()
     if model == 'feedforward':
         assert isinstance(observation_space, Box)
         in_dims = observation_space.shape[0]
-        return FeedforwardModel(in_dims, config.n_layers, config.n_nodes, n_actions, config.normalize)
-    if model == 'transformer':
+        result: nn.Module = FeedforwardModel(in_dims,
+                n_layers, n_nodes, n_actions,
+                normalize)
+    elif model == 'transformer':
         assert isinstance(observation_space, Dict)
         assert 'cars' in observation_space.spaces and 'stations' in observation_space.spaces
         car_dims: int = observation_space['cars'].shape[1]
         station_dims: int = observation_space['stations'].shape[1]
-        return TransformerModel(car_dims, station_dims, n_actions, config.n_layers, config.n_nodes, config.n_heads, config.normalize)
+        result: nn.Module = TransformerModel(
+                car_dims, station_dims, n_actions, n_layers,
+                n_nodes, n_heads, normalize)
+    else:
+        raise Exception(f"model must be in [feedforward, transformer], got {model}")
+    return result.to(device)
+

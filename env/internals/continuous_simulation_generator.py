@@ -4,11 +4,10 @@ from copy import deepcopy
 
 import numpy as np
 from numpy.random import RandomState
-from wandb.util import PreInitObject as Config
 
 from internals.continuous_simulation_engine import ContinuousSimulationEngine
 from env.simulation_events import ArrivalEvent, QueryEvent, Arrivals, Queries
-from misc.utils import optional_random, array_shuffle
+from misc.utils import optional_random, array_shuffle, kwargify
 
 
 class ContinuousSimulationGenerator:
@@ -17,7 +16,11 @@ class ContinuousSimulationGenerator:
             departures: List[List[int]],
             initial_station_state: np.ndarray,
             station_info: np.ndarray,
-            config: Config):
+            sample_distance: float,
+            sample_amount: float,
+            max_cars: int,
+            car_speed: float,
+            **kwargs):
         """
 
         :param arrivals: List[List[ArrivalEvents]]: [max_t, ]
@@ -32,41 +35,45 @@ class ContinuousSimulationGenerator:
         :param station_info: np.ndarray[float] : [n_stations, 3]
             idx => (x, y, max_occupancy)
             information about each station, indexed by rows
-        :param config:other configurations for the simulation
-            config.sample_distance: float => samples are generated around arrival event
+        :param sample_distance: float
+            samples are generated around arrival event
                 with range Normal(0, sample_distance)
-            config.sample_amount: Union[float, int]
+        :param sample_amount: Union[float, int]
                 int => generates this many queries
                 float => turns this percentage of arrivals in to queries
-            config.max_cars: int
+        :param max_cars: int
                 the number of slots to allocate for holding car data
-            config.car_speed: float => how far each car moves towards destination
-                at each timestep
+        :param car_speed: float
+            how far each car moves towards destination at each timestep
+        :param kwargs: for compatibility
         """
+        kwargs = kwargify(locals())
         self.arrivals: Arrivals = arrivals
         self.departures: List[List[int]] = departures
         self.initial_station_state: np.ndarray = initial_station_state
         self.station_info: np.ndarray = station_info
-        self.sample_distance: int = config.sample_distance
-        self.sample_amount: Union[int, float] = config.sample_amount
-        self.car_speed: float = config.car_speed
-        self.max_cars: int = config.max_cars
+        self.sample_distance: int = sample_distance
+        self.sample_amount: Union[int, float] = sample_amount
+        self.car_speed: float = car_speed
+        self.max_cars: int = max_cars
         self.random: RandomState = optional_random()
-        self.config: Config = config
+        self.kwargs = kwargs
 
     def generate(self) -> ContinuousSimulationEngine:
         arrivals, query_protos = self._base_query_arrival_split_()
         queries: Queries = self._to_queries_(query_protos)
         queries = self._adjust_query_time_(queries, query_protos)
         initial_car_state: np.ndarray = self._make_initial_cars_()
-        return ContinuousSimulationEngine(
-            arrivals,
-            queries,
-            deepcopy(self.departures),
-            self.initial_station_state.copy(),
-            initial_car_state,
-            self.station_info.copy(),
-            self.config)
+        kwargs = self.kwargs.copy()
+        kwargs.update({
+            'arrivals': arrivals,
+            'queries': queries,
+            'departures' : deepcopy(self.departures),
+            'initial_station_state' : self.initial_station_state.copy(),
+            'initial_car_state' : initial_car_state.copy(),
+            'station_info': self.station_info.copy(),
+        })
+        return ContinuousSimulationEngine(**kwargs)
 
     def _adjust_query_time_(self,
             queries: Queries,

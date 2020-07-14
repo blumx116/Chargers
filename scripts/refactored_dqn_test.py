@@ -4,25 +4,19 @@ import warnings
 import numpy.random as rand
 import numpy as np
 import torch
-import torch.nn as nn
-import torch.optim as optim
-from agent.dqn import DQNAgent, make_model
-from agent.diagnostic import train
-from env import make_and_wrap_env
-from misc.config import init_config
-torch.manual_seed(1)
-torch.backends.cudnn.deterministic = True
-torch.backends.cudnn.benchmark = False
-np.random.seed(1)
 
-from env import load_continuous_simulation
-from env.wrappers import SummedRewardWrapper, StaticFlatWrapper, NormalizedPositionWrapper
+from agent.diagnostic import train
+from agent import make_agent
+from env import make_and_wrap_env
+from misc.wandb_utils import init_config, use_wandb
 from agent.dqn import make_model
+
+
 
 warnings.simplefilter('once')
 
 settings = {
-    'algorithm': 'basic dqn',
+    'algorithm': 'dqn',
     'model': 'feedforward',
     'n_layers': 2,
     'n_heads': 4,
@@ -45,16 +39,24 @@ settings = {
     'epsilon_start': 1.0,
     'epsilon_end': 0.01,
     'epsilon_decay': 300000,
-    'max_ts': 140000
-}
+    'max_ts': 140000,
+    'seed': 0}
 
-config = init_config(settings, project='chargers')
+torch.manual_seed(settings['seed'])
+torch.backends.cudnn.deterministic = True
+torch.backends.cudnn.benchmark = False
+np.random.seed(settings['seed'])
 
-sim = make_and_wrap_env(config)
+sim = make_and_wrap_env(**settings)
 
-q_model = make_model(config, sim.observation_space, sim.action_space).to(torch.device("cuda:0"))
-q_target = deepcopy(q_model)
+settings.update({
+    'observation_space': sim.observation_space,
+    'action_space': sim.action_space,
+    'device': torch.device("cuda:0"),
+})
 
-agent = DQNAgent(q_model, q_model, sim, config, device=torch.device('cuda:0'), random=0)
+init_config(settings, project='chargers', force_wandb=False)
 
-train(agent, sim, config)
+agent = make_agent(**settings)
+
+train(agent, sim, **settings)

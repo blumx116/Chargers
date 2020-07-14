@@ -19,7 +19,7 @@ class Agent:
             reward,
             next_state,
             next_context,
-            done: bool):
+            done: bool) -> None:
         pass
 
     def step(self, global_timestep: int) -> None:

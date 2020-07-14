@@ -1,7 +1,7 @@
 import itertools
 import os
 from pathlib import Path
-from typing import List, Iterable, TypeVar, Union, Tuple, Generic
+from typing import List, Iterable, TypeVar, Union, Tuple, Dict, Any
 
 import numpy as np
 from numpy.random import RandomState
@@ -220,6 +220,14 @@ PROJECT_BASE_DIR: str = os.path.abspath(os.path.join(
 
 def is_onehot(vec: Union[torch.Tensor, np.ndarray]) -> bool:
     return vec.sum() == vec.max() == 1.
+
+def kwargify(locals: Dict[str, Any]) -> Dict[str, Any]:
+    if 'self' in locals:
+        locals.pop('self')
+    if 'kwargs' in locals:
+        kwargs = locals.pop('kwargs')
+        locals = {**kwargs, **locals}
+    return locals
 
 
 def np_onehot(values: Union[int, List[int], np.ndarray], max: int) -> np.ndarray:
