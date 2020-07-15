@@ -24,7 +24,7 @@ def make_and_wrap_env(
     """
     sim = load_continuous_simulation(**kwargs)
     algorithm = algorithm.lower()
-    if algorithm in ['nearest']:
+    if algorithm in ['nearest', 'open']:
         return sim
     model = model.lower()
     if model == 'feedforward':
