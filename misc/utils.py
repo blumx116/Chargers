@@ -42,6 +42,12 @@ def optional_random(rand_seed: Union[int, RandomState] = None):
     else:
         return rand_seed
 
+def optional_device(device: Union[str, torch.device] = None) -> torch.device:
+    if isinstance(device, torch.device):
+        return device
+    elif device is None:
+        device: str = "cuda:0" if torch.cuda.is_available() else "cpu"
+    return torch.device(device)
 
 def array_unique(data: Iterable[np.ndarray], return_inverse=False, 
         return_counts = False) -> List[np.ndarray]:
