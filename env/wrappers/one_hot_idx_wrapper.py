@@ -21,16 +21,20 @@ class OneHotIndexWrapper(gym.core.ObservationWrapper, ContinuousSimulation):
 
     def observation(self,
             observation: State) -> State:
-        indices: np.ndarray = np_onehot(observation.car_dest_idx, max=self.n_stations-1)
+        car_indices: np.ndarray = np_onehot(observation.car_dest_idx, max=self.n_stations-1)
         # np.ndarray[int32] : [cur_n_cars, 1, self.n_stations]
-        indices = indices[:, 0, :]
+        car_indices= car_indices[:, 0, :]
         # [cur_n_cars, self.n_stations]
+        station_indices: np.ndarray = np_onehot(observation.station_idx, max=self.n_stations-1)
+        station_indices = station_indices[:, 0, :]
+        # [n_stations, n_stations] should be eye(n_stations)
         return State(
+            station_idx=observation.station_idx,
             station_locations=observation.station_locations,
             station_maxes=observation.station_maxes,
             station_occs=observation.station_occs,
             car_dest_loc=observation.car_dest_loc,
-            car_dest_idx=indices,
+            car_dest_idx=car_indices,
             car_locs=observation.car_locs,
             query_loc=observation.query_loc,
             t=observation.t,

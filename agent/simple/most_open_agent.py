@@ -33,7 +33,7 @@ class MostOpenAgent(Agent):
         :return: torch[f32, device] : [1, n_stations]
         """
         maxes: np.ndarray = observation.station_maxes.astype(np.float32)
-        currents: np.ndarray = observation.station_maxes.astype(np.float32)
+        currents: np.ndarray = observation.station_occs.astype(np.float32)
         # both np.ndarray[f32] : [n_stations, 1]
         if self.use_percent:
             scores: np.ndarray = 1 - (currents / maxes)

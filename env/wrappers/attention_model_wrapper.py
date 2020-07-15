@@ -43,7 +43,8 @@ class AttentionModelWrapper(gym.core.ObservationWrapper, ContinuousSimulation):
         # NOTE: all calculations assume that State is as it was in SimulationState
         # at least for comments. Code is fully compatibl
         stations: np.ndarray = np.concatenate(
-            (observation.station_locations,
+            (observation.station_idx,
+             observation.station_locations,
              observation.station_occs,
              observation.station_maxes), axis=1).astype(np.float32)
         # np.ndarray[float32] : [n_stations, 4] => (x, y, occ, max)

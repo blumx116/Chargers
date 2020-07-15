@@ -51,6 +51,7 @@ class TimeEncodingWrapper(gym.core.ObservationWrapper, ContinuousSimulation):
 
     def observation(self, observation: State):
         return State(
+            station_idx=observation.station_idx,
             station_locations=observation.station_locations,
             station_occs=observation.station_occs,
             station_maxes=observation.station_maxes,
@@ -88,6 +89,7 @@ class PositionEncodingWrapper(gym.core.ObservationWrapper, ContinuousSimulation)
 
     def observation(self, observation: State):
         return State(
+            station_idx=observation.station_idx,
             station_locations=self._encode_loc(observation.station_locations),
             station_occs=observation.station_occs,
             station_maxes=observation.station_maxes,

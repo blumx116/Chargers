@@ -78,6 +78,8 @@ class ContinuousSimulation(gym.Env):
         self.max_cars: int = self.engine.max_cars
         self.max_occ: int = np.max(self.engine.station_info[:, 2])
         self.observation_space = DictSpace({
+            'station_idx':
+                Box(0, n_stations, (n_stations, 1), dtype=np.int32),
             'station_locations':
                 Box(0, np.inf, (n_stations, 2), dtype=np.float32),
             'station_occs':

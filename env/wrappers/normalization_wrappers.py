@@ -44,6 +44,7 @@ class NormalizedPositionWrapper(gym.core.ObservationWrapper, ContinuousSimulatio
 
     def observation(self, observation: State) -> State:
         return State(
+            station_idx=observation.station_idx,
             station_locations=self._normalize_loc_(observation.station_locations),
             station_occs=observation.station_occs,
             station_maxes=observation.station_maxes,
@@ -74,6 +75,7 @@ class NormalizedTimeWrapper(gym.core.ObservationWrapper, ContinuousSimulation):
     def observation(self, observation: State) -> State:
         new_t: float = (observation.t / self._max_t).astype(np.float32)
         return State(
+            station_idx=observation.station_idx,
             station_locations=observation.station_locations,
             station_occs=observation.station_occs,
             station_maxes=observation.station_maxes,

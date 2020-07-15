@@ -50,6 +50,9 @@ class StaticFlatWrapper(gym.core.ObservationWrapper, ContinuousSimulation):
         observation: Dict = observation._asdict()
         arrs: List[np.ndarray] = []
         for key in observation.keys():
+            if key == 'station_idx':
+                pass
+                # station indices are constant - ignore them
             correct_shape: Tuple[int] = self.env.observation_space[key].shape
             # the shape specified in observation_space isn't accurate, because
             # the dimensions are variable. Here, we're fixing it to max size

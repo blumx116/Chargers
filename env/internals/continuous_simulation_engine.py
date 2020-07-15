@@ -15,7 +15,8 @@ Action = int # [range: 0 -> n_stations-1]
 Reward = np.ndarray # np.ndarray[float32] : [n_stations,]
 SimulationState = NamedTuple(
     "SimulationState",
-    [('station_locations', np.ndarray),  # np.ndarray[float32] : [n_stations, 2] => (x, y)
+    [('station_idx', np.ndarray),  # np.ndarray[f32] : [n_stations, 1]
+    ('station_locations', np.ndarray),  # np.ndarray[float32] : [n_stations, 2] => (x, y)
      ("station_occs", np.ndarray),  # np.ndarray[int32] : [n_stations, 1]
      ("station_maxes", np.ndarray), # np.ndarray[int32] : [n_stations, 1]
      ("car_locs", np.ndarray),  # np.ndarray[float32]: [n_stations 2 => (x, y)
@@ -143,6 +144,7 @@ class ContinuousSimulationEngine:
         else:
             query_loc: np.ndarray = np.zeros(shape=(1,2), dtype=np.float32)
         return State(
+            station_idx=np.arange(0, self.n_stations).reshape((-1, 1)).astype(np.int32),
             station_locations=self.station_info[:, :2].copy(),
             station_occs=self.station_state.copy(),
             station_maxes=self.station_info[:, 2, np.newaxis].copy(),
@@ -226,7 +228,7 @@ class ContinuousSimulationEngine:
                 self.departures[departure_time].append(station_idx)
             return True
         else:
-            if self.t < self.max_t:
+            if self.t < self.max_t - 1:
                 self.queries[self.t + 1].append(
                     QueryEvent(
                         x=self.station_info[station_idx, 0],
