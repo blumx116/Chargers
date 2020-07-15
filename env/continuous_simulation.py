@@ -1,7 +1,8 @@
-from typing import Union, Tuple, Optional, List
+from typing import Union, Tuple, Optional, List, Any, Dict
 
 import gym
-from gym.spaces import Space, Dict, Discrete, Box
+from gym.spaces import Space, Discrete, Box
+from gym.spaces import Dict as DictSpace
 import numpy as np
 from numpy.random import RandomState
 import pandas as pd
@@ -70,12 +71,13 @@ class ContinuousSimulation(gym.Env):
 
         self.reset()
 
-    def reset(self):
-        self.engine = self.generator.generate()
+    def reset(self,
+            logging: bool = False):
+        self.engine = self.generator.generate(logging=True)
         n_stations: int = self.engine.n_stations
         self.max_cars: int = self.engine.max_cars
         self.max_occ: int = np.max(self.engine.station_info[:, 2])
-        self.observation_space = Dict({
+        self.observation_space = DictSpace({
             'station_locations':
                 Box(0, np.inf, (n_stations, 2), dtype=np.float32),
             'station_occs':
@@ -115,6 +117,9 @@ class ContinuousSimulation(gym.Env):
 
     def __str__(self) -> str:
         ...
+
+    def summary(self) -> Dict[str, Any]:
+        return self.engine.summary()
 
 
 def load_continuous_simulation(

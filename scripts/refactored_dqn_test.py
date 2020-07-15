@@ -5,12 +5,10 @@ import numpy.random as rand
 import numpy as np
 import torch
 
-from agent.diagnostic import train
+from agent.diagnostic import train, diagnostic
 from agent import make_agent
 from env import make_and_wrap_env
 from misc.wandb_utils import init_config, use_wandb
-from agent.dqn import make_model
-
 
 
 warnings.simplefilter('once')
@@ -25,14 +23,14 @@ settings = {
     'max_cars': 200,
     'car_speed': 0.1,
     'sample_distance': 0.3,
-    'sample_amount': 0.4,
+    'sample_amount': 5,
     'date': '06-27-2019',
     'region': 'haidian',
     'learning_rate': 1e-5,
     'replay_size': 100000,
     'target_network_update_freq': 10000,
     'log_every': 10,
-    'test_every': 1000,
+    'test_every': 100,
     'gamma': 0.99,
     'start_train_ts': 1000,
     'batch_size': 32,
@@ -55,8 +53,10 @@ settings.update({
     'device': torch.device("cuda:0"),
 })
 
-init_config(settings, project='chargers', force_wandb=False)
+init_config(settings, project='chargers', force_wandb=True)
 
 agent = make_agent(**settings)
-
-train(agent, sim, **settings)
+test = lambda agent: diagnostic(
+    agent=agent, env=sim,
+    wandb=settings['wandb'], seeds=iter(range(1, 10)))
+train(agent, sim, test=test, **settings)

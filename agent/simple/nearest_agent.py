@@ -7,7 +7,7 @@ import torch
 
 from agent import Agent
 from env import State
-from env.env_utils import get_distances
+from env.internals.continuous_simulation_engine import get_distances
 from misc.utils import optional_random
 
 

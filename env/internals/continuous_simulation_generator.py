@@ -59,7 +59,8 @@ class ContinuousSimulationGenerator:
         self.random: RandomState = optional_random()
         self.kwargs = kwargs
 
-    def generate(self) -> ContinuousSimulationEngine:
+    def generate(self,
+            logging: bool = False) -> ContinuousSimulationEngine:
         arrivals, query_protos = self._base_query_arrival_split_()
         queries: Queries = self._to_queries_(query_protos)
         queries = self._adjust_query_time_(queries, query_protos)
@@ -72,6 +73,7 @@ class ContinuousSimulationGenerator:
             'initial_station_state' : self.initial_station_state.copy(),
             'initial_car_state' : initial_car_state.copy(),
             'station_info': self.station_info.copy(),
+            'logging': logging
         })
         return ContinuousSimulationEngine(**kwargs)
 

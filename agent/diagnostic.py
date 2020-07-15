@@ -1,4 +1,5 @@
-from typing import Iterator, List, Callable
+from numbers import Number
+from typing import Iterator, List, Callable, Dict
 
 import numpy as np
 import wandb
@@ -6,13 +7,13 @@ import wandb
 from agent import Agent
 from agent.dqn import ReplayBuffer
 from env import ContinuousSimulation
-from misc.wandb_utils import log
+from misc.utils import flatmap
+from misc.wandb_utils import log, log_histogram
 
 
 def diagnostic(
         agent: Agent,
         env: ContinuousSimulation,
-        gamma: float = 0.99,
         wandb: bool = True,
         seeds: Iterator[int] = None) -> None:
     """
@@ -21,8 +22,6 @@ def diagnostic(
         Agent to evaluate (will not be changed)
     :param env: ContinuousSimulation
         environment to test in
-    :param gamma: float in [0, 1]
-        discount factor
     :param (optional) wandb: bool
         whether or not to use wandb
         defaults to True
@@ -32,16 +31,19 @@ def diagnostic(
     :return: all results logged to either wandb or console
     """
     if seeds is None:
-        seeds = range(0, 10)
+        seeds = iter(range(0, 10))
     seed = next(seeds, None)
 
     rewards: List[float] = []
     losses: List[float] = []
     replay_buffer = ReplayBuffer(100000, seed)
 
+    summmaries: List[Dict] = []
+
     while seed is not None:
-        env.seed(0)
-        state = env.reset()
+        env.seed(seed)
+        state = env.reset(logging=True)
+        context = env.unwrapped.state()
         episode_reward: float = 0
         done = False
 
@@ -51,15 +53,37 @@ def diagnostic(
             action = agent.act(state, 0)
 
             next_state, reward, done, _ = env.step(int(action.cpu()))
+            next_context = env.unwrapped.state()
             episode_reward += reward
 
-            replay_buffer.push(state, action,reward, next_state, done)
+            replay_buffer.push(state, context, action, reward,
+                    next_state, next_context, done)
+
+            state, context = next_state, next_context
 
         rewards.append(episode_reward)
         if hasattr(agent, 'compute_td_loss'):
-            loss = agent.compute_td_loss(50, replay_buffer, None, gamma)
-            losses.append(loss.data)
+            loss = agent.compute_td_loss(*replay_buffer.sample(50))
+            losses.append(loss.cpu().data)
 
+        seed = next(seeds, None)
+
+        summmaries.append(env.summary())
+
+    aggregate_summary = {}
+    for key in summmaries[0]:
+        if isinstance(summmaries[0][key], Number):
+            # dtype is a number
+            aggregate_summary[key] = list(map(
+                lambda s: s[key], summmaries))
+        else:
+            aggregate_summary[key] = flatmap(map(
+                lambda s: s[key], summmaries))
+
+    histograms: List[str] = ['distances travelled', 'timesteps travelled', 'nearest distances']
+    log_histogram(wandb, {key: aggregate_summary[key] for key in histograms})
+    log(wandb, {key: aggregate_summary[key]  for key in aggregate_summary.keys()
+                if (key not in histograms)})
     log(wandb, {'Reward': np.mean(rewards)})
     if hasattr(agent, 'compute_td_loss'):
         log(wandb, {'Loss': np.mean(losses)})

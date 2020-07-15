@@ -5,15 +5,25 @@ import wandb
 
 
 def log(
-        wandb: bool,
+        use_wandb: bool,
         values: Dict[str, Any],
         **kwargs) -> None:
-    if wandb:
+    if use_wandb:
         wandb.log(values, **kwargs)
     else:
         for key in values.keys():
             print(key, end=' : ')
             print(values[key])
+
+def log_histogram(
+        use_wandb: bool,
+        values: Dict[str, Any],
+        **kwargs) -> None:
+    if not use_wandb:
+        log(use_wandb, values)
+    else:
+        for key in values.keys():
+            wandb.log({key: wandb.Histogram(values[key])})
 
 
 def use_wandb(

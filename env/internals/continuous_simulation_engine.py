@@ -1,3 +1,4 @@
+from math import ceil
 from typing import List, Union, Tuple, NamedTuple
 import warnings
 
@@ -26,6 +27,11 @@ SimulationState = NamedTuple(
      ])
 State = SimulationState
 
+def get_distances(
+        query: np.ndarray,
+        stations: np.ndarray) -> np.ndarray:
+    return np.linalg.norm(stations - query, axis=1)
+
 
 class ContinuousSimulationEngine:
     def __init__(self,
@@ -36,6 +42,7 @@ class ContinuousSimulationEngine:
             initial_car_state: np.ndarray,
             station_info: np.ndarray,
             car_speed: float,
+            logging: bool = False,
             **kwargs):
         """
 
@@ -59,6 +66,8 @@ class ContinuousSimulationEngine:
             information about each station, indexed by rows
         :param car_speed: float
             how far each car moves towards destination at each timestep
+        :param logging: bool = False
+            whether or not to store a summary to generate
         :param kwargs: for compatibility
         """
         assert len(arrivals) == len(queries)
@@ -72,6 +81,7 @@ class ContinuousSimulationEngine:
         self.station_state: np.ndarray = initial_station_state[:, np.newaxis]
         self.car_state: np.ndarray = initial_car_state
         self.station_info: np.ndarray = station_info
+        self.logging = logging
 
         self.open_car_indices: PriorityQueue[int] = PriorityQueue()
         for idx in reversed(range(self.car_state.shape[0])):
@@ -93,6 +103,15 @@ class ContinuousSimulationEngine:
 
         self.t: int = 0
         self._cur_reward: np.ndarray = self._zero_reward_()
+        self._summary_ = {
+            'distances travelled': [],
+            'failed dispatches': 0,
+            'timesteps travelled': [],
+            'nearest distances': [],
+            'organic fails': 0,
+            'original queries': list(map(len, self.queries)),
+            'actual queries': [0 for _ in range(self.max_t)]
+        }
 
     def done(self) -> bool:
         """
@@ -100,7 +119,7 @@ class ContinuousSimulationEngine:
         :return: True if we are at or past the end of the simulation
         False otherwise
         """
-        return self.t >= self.max_t - 1
+        return self.t >= self.max_t
 
     def info(self) -> int:
         """
@@ -147,13 +166,22 @@ class ContinuousSimulationEngine:
             self.t += 1
         return self.state(), self.reward(), self.done(), self.info()
 
+    def summary(self):
+        return self._summary_
+
     def _cur_queries_(self) -> List[QueryEvent]:
+        if self.done():
+            return []
         return self.queries[self.t]
 
     def _cur_arrivals_(self) -> List[ArrivalEvent]:
+        if self.done():
+            return []
         return self.arrivals[self.t]
 
     def _cur_departures_(self) -> List[int]:
+        if self.done():
+            return []
         return self.departures[self.t]
 
     def _move_cars_(self) -> None:
@@ -177,7 +205,9 @@ class ContinuousSimulationEngine:
 
     def _process_natural_arrivals_(self) -> None:
         for arrival in self._cur_arrivals_():
-            self._process_arrival_(arrival.idx, arrival.duration)
+            arrived: bool = self._process_arrival_(arrival.idx, arrival.duration)
+            if self.logging and not arrived:
+                self._summary_['organic fails'] += 1
 
     def _process_arrival_(self,
             station_idx: int,
@@ -236,6 +266,8 @@ class ContinuousSimulationEngine:
             # process all cars that are arriving
             if self._process_arrival_(idx, duration):
                 self._cur_reward[idx] += 3
+            else:
+                self._summary_['failed dispatches'] += 1
                 # give 3 reward whenever we have a car successfully arrive
         indices: np.ndarray = np.flatnonzero(msk)
         # list of nonzero indices
@@ -256,10 +288,23 @@ class ContinuousSimulationEngine:
         idx: int = self.open_car_indices.pop()
 
         station_x, station_y = self.station_info[referral, :2]
+
         self.car_state[idx, :] = np.asarray(
             [1, query.x, query.y,
              referral, station_x, station_y,
              query.duration])
+
+        if self.logging:
+            query_loc = np.asarray([query.x, query.y], dtype=np.float32)
+            station_loc = np.asarray([station_x, station_y], dtype=np.float32)
+            distance: float = np.linalg.norm(query_loc - station_loc)
+            self._summary_['distances travelled'].append(distance)
+            self._summary_['timesteps travelled'].append(ceil(distance / self.car_speed))
+            self._summary_['actual queries'][self.t] += 1
+
+            all_distances: np.ndarray = get_distances(query_loc, stations=self.state().station_locations)
+            min_distance: float = np.min(all_distances)
+            self._summary_['nearest distances'].append(min_distance)
 
     def _zero_reward_(self) -> Reward:
         return np.zeros(self.n_stations, dtype=np.float32)
