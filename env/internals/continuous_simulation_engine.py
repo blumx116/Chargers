@@ -111,7 +111,9 @@ class ContinuousSimulationEngine:
             'nearest distances': [],
             'organic fails': 0,
             'original queries': list(map(len, self.queries)),
-            'actual queries': [0 for _ in range(self.max_t)]
+            'actual queries': [0 for _ in range(self.max_t)],
+            'n_stations': self.n_stations,
+            'recommendation freq': np.zeros(self.n_stations)
         }
 
     def done(self) -> bool:
@@ -303,6 +305,7 @@ class ContinuousSimulationEngine:
             self._summary_['distances travelled'].append(distance)
             self._summary_['timesteps travelled'].append(ceil(distance / self.car_speed))
             self._summary_['actual queries'][self.t] += 1
+            self._summary_['recommendation freq'][referral] += 1
 
             all_distances: np.ndarray = get_distances(query_loc, stations=self.state().station_locations)
             min_distance: float = np.min(all_distances)

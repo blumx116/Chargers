@@ -14,7 +14,7 @@ from misc.wandb_utils import init_config, use_wandb
 warnings.simplefilter('once')
 
 settings = {
-    'algorithm': 'open',
+    'algorithm': 'dqn',
     'model': 'transformer',
     'n_layers': 2,
     'n_heads': 4,
@@ -53,10 +53,10 @@ settings.update({
     'device': torch.device("cuda:0"),
 })
 
-init_config(settings, project='chargers', force_wandb=False)
+init_config(settings, project='chargers', force_wandb=True)
 
 agent = make_agent(**settings)
 test = lambda agent: diagnostic(
     agent=agent, env=sim,
-    wandb=settings['wandb'], seeds=iter(range(1, 10)))
+    use_wandb=settings['use_wandb'], seeds=iter(range(1, 10)))
 train(agent, sim, test=test, **settings)

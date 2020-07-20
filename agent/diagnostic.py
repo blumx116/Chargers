@@ -14,7 +14,7 @@ from misc.wandb_utils import log, log_histogram
 def diagnostic(
         agent: Agent,
         env: ContinuousSimulation,
-        wandb: bool = True,
+        use_wandb: bool = True,
         seeds: Iterator[int] = None) -> None:
     """
 
@@ -22,7 +22,7 @@ def diagnostic(
         Agent to evaluate (will not be changed)
     :param env: ContinuousSimulation
         environment to test in
-    :param (optional) wandb: bool
+    :param (optional) use_wandb: bool
         whether or not to use wandb
         defaults to True
     :param seeds:
@@ -38,7 +38,7 @@ def diagnostic(
     losses: List[float] = []
     replay_buffer = ReplayBuffer(100000, seed)
 
-    summmaries: List[Dict] = []
+    summaries: List[Dict] = []
 
     while seed is not None:
         env.seed(seed)
@@ -68,25 +68,69 @@ def diagnostic(
 
         seed = next(seeds, None)
 
-        summmaries.append(env.summary())
+        summaries.append(env.summary())
 
-    aggregate_summary = {}
-    for key in summmaries[0]:
-        if isinstance(summmaries[0][key], Number):
+    agg_summary = {}
+    for key in summaries[0]:
+        if isinstance(summaries[0][key], Number):
             # dtype is a number
-            aggregate_summary[key] = list(map(
-                lambda s: s[key], summmaries))
+            agg_summary[key] = list(map(
+                lambda s: s[key], summaries))
         else:
-            aggregate_summary[key] = flatmap(map(
-                lambda s: s[key], summmaries))
+            agg_summary[key] = flatmap(map(
+                lambda s: s[key], summaries))
+    max_ts: int = max(map(lambda s: len(s['actual queries']), summaries))
+    for key in ['original queries', 'actual queries']:
+        agg_summary[key] = np.zeros(max_ts)
+        agg_summary['min ' + key] = np.full(max_ts, np.inf)
+        agg_summary['max ' + key] = np.full(max_ts, -np.inf)
+        for s in summaries:
+            for t in range(max_ts):
+                agg_summary[key][t] += s[key][t]
+                agg_summary['max ' + key][t] = max(agg_summary['max ' + key][t], s[key][t])
+                agg_summary['min ' + key][t] = min(agg_summary['min ' + key][t], s[key][t])
 
+    # TODO: this assumes that all stations are ordered in the same order, which may not be correct
+    max_stations: int = max(map(lambda s: s['n_stations'], summaries))
+    agg_summary['recommendation freq'] = np.zeros(max_stations)
+    for summ in summaries:
+        agg_summary['recommendation freq'][0:summ['n_stations']] += summ['recommendation freq']
+
+    def janky_histogram(seq: np.ndarray):
+        return wandb.Histogram(np_histogram=(seq, np.arange(len(seq) + 1)))
+    # these values count the number of queries per timestep summed over all episodes
     histograms: List[str] = ['distances travelled', 'timesteps travelled', 'nearest distances']
-    log_histogram(wandb, {key: aggregate_summary[key] for key in histograms})
-    log(wandb, {key: aggregate_summary[key]  for key in aggregate_summary.keys()
-                if (key not in histograms)})
-    log(wandb, {'Reward': np.mean(rewards)})
+    if use_wandb:
+        dist_histogram = np.histogram(agg_summary['distances travelled'], bins=20)
+        near_histogram = np.histogram(agg_summary['nearest distances'], bins=20)
+
+        exp_bins: np.ndarray = 2 ** np.arange(0, 10)
+        exp_bins = np.insert(exp_bins, 0, 0, axis=0)
+        # [0, 1, 2, 4, 8, 16, 32, 64, 128, 512]
+        failed_histogram = np.histogram(agg_summary['failed dispatches'], bins=exp_bins)
+        organic_histogram = np.histogram(agg_summary['organic fails'], bins=exp_bins)
+        time_histogram = np.histogram(agg_summary['timesteps travelled'], bins=np.arange(max_ts+1))
+
+        wandb.log({
+            'distances travelled': wandb.Histogram(sequence=agg_summary['distances travelled']),
+            'nearest distances': wandb.Histogram(sequence=agg_summary['nearest distances']),
+            'timesteps travelled': wandb.Histogram(np_histogram=time_histogram),
+            'failed dispatches': wandb.Histogram(np_histogram=failed_histogram),
+            'organic fails': wandb.Histogram(np_histogram=organic_histogram)
+        })
+    else:
+        for key in agg_summary:
+            print(key, end=' : ')
+            print(agg_summary[key])
+        print('===================================')
+    """
+    log_histogram(use_wandb, {key: agg_summary[key] for key in histograms})
+    log(use_wandb, {key: agg_summary[key] for key in agg_summary.keys()
+                    if (key not in histograms)})
+    """
+    log(use_wandb, {'Reward': np.mean(rewards)})
     if hasattr(agent, 'compute_td_loss'):
-        log(wandb, {'Loss': np.mean(losses)})
+        log(use_wandb, {'Loss': np.mean(losses)})
 
 
 def train(agent: Agent,
@@ -95,7 +139,7 @@ def train(agent: Agent,
           test_every: int,
           target_network_update_freq: int,
           max_ts: int,
-          wandb: bool = True,
+          use_wandb: bool = True,
           env_seeds: Iterator[int] = None,
           test: Callable[[Agent], None] = None,
           **kwargs) -> Agent:
@@ -113,7 +157,7 @@ def train(agent: Agent,
         updates the target_network with this frequency (in timesteps)
     :param max_ts: int
         will stop training after max_ts timesteps
-    :param (optional) wandb: bool = True
+    :param (optional) use_wandb: bool = True
         whether to log to wandb or not. If not, logs to console
     :param env_seeds:
         seeds to seed environment with upon resets, in order
@@ -152,7 +196,7 @@ def train(agent: Agent,
         agent.step(ts)
 
         if ts % log_every == 0:
-            log(wandb,
+            log(use_wandb,
                 { 'global timestep': ts,
                 'num updates': int(ts / target_network_update_freq),
                 'num episodes': n_eps_completed})
