@@ -3,12 +3,10 @@ import warnings
 
 import numpy.random as rand
 import numpy as np
-import torch
 
 from agent.diagnostic import train, diagnostic
 from agent import make_agent
 from env import make_and_wrap_env
-from misc.wandb_utils import init_config, use_wandb
 
 
 warnings.simplefilter('once')
@@ -40,9 +38,6 @@ settings = {
     'max_ts': 140000,
     'seed': 0}
 
-torch.manual_seed(settings['seed'])
-torch.backends.cudnn.deterministic = True
-torch.backends.cudnn.benchmark = False
 np.random.seed(settings['seed'])
 
 sim = make_and_wrap_env(**settings)
@@ -52,8 +47,6 @@ settings.update({
     'action_space': sim.action_space,
     'device': torch.device("cuda:0"),
 })
-
-init_config(settings, project='chargers', force_wandb=True)
 
 agent = make_agent(**settings)
 test = lambda agent: diagnostic(

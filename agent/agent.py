@@ -1,5 +1,3 @@
-import torch
-
 from env import State, Action
 
 class Agent:

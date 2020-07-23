@@ -5,7 +5,7 @@ from typing import List, Iterable, TypeVar, Union, Tuple, Dict, Any
 
 import numpy as np
 from numpy.random import RandomState
-import torch
+import tensorflow as tf
 
 T = TypeVar("T")
 V = TypeVar("V")
@@ -42,12 +42,12 @@ def optional_random(rand_seed: Union[int, RandomState] = None):
     else:
         return rand_seed
 
-def optional_device(device: Union[str, torch.device] = None) -> torch.device:
-    if isinstance(device, torch.device):
+def optional_device(device: Union[str, tf.device] = None) -> tf.device:
+    if isinstance(device, tf.device):
         return device
     elif device is None:
-        device: str = "cuda:0" if torch.cuda.is_available() else "cpu"
-    return torch.device(device)
+        device: str = "/GPU:0" if len(tf.config.list_physical_devices('GPU')) else "/device:CPU:0"
+    return tf.device(device)
 
 def array_unique(data: Iterable[np.ndarray], return_inverse=False, 
         return_counts = False) -> List[np.ndarray]:

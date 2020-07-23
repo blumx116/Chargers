@@ -2,13 +2,11 @@ from numbers import Number
 from typing import Iterator, List, Callable, Dict
 
 import numpy as np
-import wandb
 
 from agent import Agent
 from agent.dqn import ReplayBuffer
 from env import ContinuousSimulation
 from misc.utils import flatmap
-from misc.wandb_utils import log, log_histogram
 
 
 def diagnostic(
@@ -123,11 +121,7 @@ def diagnostic(
             print(key, end=' : ')
             print(agg_summary[key])
         print('===================================')
-    """
-    log_histogram(use_wandb, {key: agg_summary[key] for key in histograms})
-    log(use_wandb, {key: agg_summary[key] for key in agg_summary.keys()
-                    if (key not in histograms)})
-    """
+
     log(use_wandb, {'Reward': np.mean(rewards)})
     if hasattr(agent, 'compute_td_loss'):
         log(use_wandb, {'Loss': np.mean(losses)})
@@ -198,7 +192,7 @@ def train(agent: Agent,
         if ts % log_every == 0:
             log(use_wandb,
                 { 'global timestep': ts,
-                'num updates': int(ts / target_network_update_freq),
+                'num updates': (ts / target_network_update_freq),
                 'num episodes': n_eps_completed})
             agent.log(ts)
 

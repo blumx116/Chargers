@@ -2,9 +2,6 @@ from typing import Union, Iterator, Tuple, Any
 
 import numpy as np
 from numpy.random import RandomState
-import torch
-import torch.nn as nn
-import torch.optim as optim
 import wandb
 
 from agent import Agent

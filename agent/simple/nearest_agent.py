@@ -3,7 +3,6 @@ from typing import Union
 from gym.spaces import Discrete
 import numpy as np
 from numpy.random import RandomState
-import torch
 
 from agent import Agent
 from env import State

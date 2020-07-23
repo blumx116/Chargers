@@ -2,7 +2,6 @@ from agent import Agent
 
 from gym.spaces import Discrete
 import numpy as np
-import torch
 
 from env import State
 from misc.utils import optional_device
