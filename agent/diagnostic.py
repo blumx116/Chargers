@@ -12,7 +12,6 @@ from misc.utils import flatmap
 def diagnostic(
         agent: Agent,
         env: ContinuousSimulation,
-        use_wandb: bool = True,
         seeds: Iterator[int] = None) -> None:
     """
 
@@ -20,9 +19,6 @@ def diagnostic(
         Agent to evaluate (will not be changed)
     :param env: ContinuousSimulation
         environment to test in
-    :param (optional) use_wandb: bool
-        whether or not to use wandb
-        defaults to True
     :param seeds:
         seeds to reset environment with, tests will be evaluated on these seeds
         defaults to range(0, 10)
@@ -45,12 +41,10 @@ def diagnostic(
         episode_reward: float = 0
         done = False
 
-
-
         while not done:
             action = agent.act(state, 0)
 
-            next_state, reward, done, _ = env.step(int(action.cpu()))
+            next_state, reward, done, _ = env.step(int(action))
             next_context = env.unwrapped.state()
             episode_reward += reward
 
@@ -62,7 +56,7 @@ def diagnostic(
         rewards.append(episode_reward)
         if hasattr(agent, 'compute_td_loss'):
             loss = agent.compute_td_loss(*replay_buffer.sample(50))
-            losses.append(loss.cpu().data)
+            losses.append(loss.numpy())
 
         seed = next(seeds, None)
 
@@ -94,6 +88,8 @@ def diagnostic(
     for summ in summaries:
         agg_summary['recommendation freq'][0:summ['n_stations']] += summ['recommendation freq']
 
+
+    """
     def janky_histogram(seq: np.ndarray):
         return wandb.Histogram(np_histogram=(seq, np.arange(len(seq) + 1)))
     # these values count the number of queries per timestep summed over all episodes
@@ -125,6 +121,7 @@ def diagnostic(
     log(use_wandb, {'Reward': np.mean(rewards)})
     if hasattr(agent, 'compute_td_loss'):
         log(use_wandb, {'Loss': np.mean(losses)})
+    """
 
 
 def train(agent: Agent,
@@ -133,7 +130,6 @@ def train(agent: Agent,
           test_every: int,
           target_network_update_freq: int,
           max_ts: int,
-          use_wandb: bool = True,
           env_seeds: Iterator[int] = None,
           test: Callable[[Agent], None] = None,
           **kwargs) -> Agent:
@@ -151,8 +147,6 @@ def train(agent: Agent,
         updates the target_network with this frequency (in timesteps)
     :param max_ts: int
         will stop training after max_ts timesteps
-    :param (optional) use_wandb: bool = True
-        whether to log to wandb or not. If not, logs to console
     :param env_seeds:
         seeds to seed environment with upon resets, in order
         doesn't set seed if not provided
@@ -174,26 +168,35 @@ def train(agent: Agent,
     for ts in range(1, max_ts + 1):
         action = agent.act(state, context, mode='train', network='q')
 
-        next_state, reward, done, _ = env.step(int(action.cpu()))
+        next_state, reward, done, _ = env.step(int(action))
         next_context = env.unwrapped.state()
 
         agent.remember(state, context, action, reward,
                        next_state, next_context, done)
 
+        state, context = next_state, next_context
+
         if done:
             n_eps_completed += 1
             state = env.reset()
+            context = env.unwrapped.state()
             if env_seeds is not None:
                 env.seed(next(env_seeds))
 
-        agent.optimize()
+        if ts > 100:
+            agent.optimize()
         agent.step(ts)
 
+        if ts % 100:
+            print(ts)
+
         if ts % log_every == 0:
+            """
             log(use_wandb,
                 { 'global timestep': ts,
                 'num updates': (ts / target_network_update_freq),
                 'num episodes': n_eps_completed})
+            """
             agent.log(ts)
 
         if ts % test_every == 0 and test is not None:

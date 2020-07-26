@@ -3,6 +3,7 @@ from typing import Union
 from gym.spaces import Discrete
 import numpy as np
 from numpy.random import RandomState
+import tensorflow as tf
 
 from agent import Agent
 from env import State
@@ -12,19 +13,19 @@ from misc.utils import optional_device
 
 class NearestAgent(Agent):
     def __init__(self,
-            device: torch.device = None,
+            device: tf.device = None,
             **kwargs):
         """
-        :param (optional) device: torch.device
+        :param (optional) device: tf.device
             device to put returned values on
         :param kwargs: for compatibility
         """
-        self.device: torch.device = optional_device(device)
+        self.device: tf.device = optional_device(device)
 
     def score(self,
             observation: State,
             context: State,
-            network='q') -> torch.Tensor:
+            network='q') -> tf.Tensor:
         """
         gives closer stations higher scores
         :param observation: raw from unwrapped environment
@@ -34,7 +35,7 @@ class NearestAgent(Agent):
         """
         scores: np.ndarray = -get_distances(observation.query_loc,
                 stations=observation.station_locations)
-        scores: torch.Tensor = torch.from_numpy(scores)
+        scores: tf.Tensor = torch.from_numpy(scores)
         # [n_stations, ]
         return scores.type(torch.float32).to(self.device).unsqueeze((0))
 
@@ -52,7 +53,7 @@ class NearestAgent(Agent):
             observation: State,
             context: State,
             mode='test',
-            network='q') -> torch.Tensor:
+            network='q') -> tf.Tensor:
         """
         gives closer stations higher scores
         :param observation: raw from unwrapped environment
@@ -61,7 +62,7 @@ class NearestAgent(Agent):
         :param network: ignored, present for compatibility
         :return: torch[int64, device] : max_index
         """
-        scores: torch.Tensor = self.score(observation, observation)
+        scores: tf.Tensor = self.score(observation, observation)
         # Tensor[f32, dev] : [1, n_stations]
         return scores.max(1)[1].data[0]
 

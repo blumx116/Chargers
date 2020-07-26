@@ -7,16 +7,17 @@ import numpy as np
 from agent.diagnostic import train, diagnostic
 from agent import make_agent
 from env import make_and_wrap_env
+import tensorflow as tf
 
 
 warnings.simplefilter('once')
 
 settings = {
     'algorithm': 'dqn',
-    'model': 'transformer',
+    'model': 'trxli',
     'n_layers': 2,
     'n_heads': 4,
-    'n_nodes' : 8,
+    'n_nodes' : 160,
     'normalize': True,
     'max_cars': 200,
     'car_speed': 0.1,
@@ -28,7 +29,7 @@ settings = {
     'replay_size': 100000,
     'target_network_update_freq': 10000,
     'log_every': 10,
-    'test_every': 100,
+    'test_every': 101,
     'gamma': 0.99,
     'start_train_ts': 1000,
     'batch_size': 32,
@@ -45,11 +46,11 @@ sim = make_and_wrap_env(**settings)
 settings.update({
     'observation_space': sim.observation_space,
     'action_space': sim.action_space,
-    'device': torch.device("cuda:0"),
+    'device': tf.device("/physical_device:GPU:0"),
 })
 
 agent = make_agent(**settings)
 test = lambda agent: diagnostic(
     agent=agent, env=sim,
-    use_wandb=settings['use_wandb'], seeds=iter(range(1, 10)))
+    seeds=iter(range(1, 10)))
 train(agent, sim, test=test, **settings)

@@ -1,3 +1,4 @@
+from math import ceil
 from typing import List
 from gym.spaces import Space, Discrete, Box, Dict
 
@@ -35,13 +36,13 @@ class AttentionLayer(BaseDenseAttention):
             use_scale: bool = False,
             device: tf.device = None,
             **kwargs):
-        kwargs = kwargify(locals())
-        super().__init__(**kwargs)
+        super().__init__()
         self.device = device
         self.use_scale: bool = use_scale
 
     def build(self, input_shape):
         super().build(input_shape)
+
 
     def _calculate_scores(self,
             query: tf.Tensor,
@@ -62,30 +63,30 @@ class AttentionLayer(BaseDenseAttention):
 
 class ProjectedAttentionLayer(Layer):
     def __init__(self,
-            n_dims: int,
-            use_scale: bool = True,
-            device: tf.device = None,
-            **kwargs):
+                 encoding_dim: int,
+                 use_scale: bool = True,
+                 device: tf.device = None,
+                 **kwargs):
         """
 
-        :param n_dims:  number of dimensions to linearly encode key, value and query in
+        :param encoding_dim:  number of dimensions to linearly encode key, value and query in
             if -1, will simply use key query and value as provided (e.g. identity encoder)
         :param use_scale: whether or not to scale scores by 1/sqrt(d)
         :param device: device to place everything ong
         :param kwargs: comaptibility
         """
-        kwargs = kwargify(locals())
-        super().__init__(kwargs)
-        self.encode: bool = n_dims != -1
-        self.n_dims: int = n_dims
+        super().__init__()
+        device: tf.device = optional_device(device)
+        self.encode: bool = encoding_dim != -1
+        self.encoding_dim: int = encoding_dim
         self.device: tf.device = optional_device(device)
         self.use_scale: bool = use_scale
 
         if self.encode:
             with self.device:
-                self.key_encoder: Layer = layers.Dense(n_dims)
-                self.query_encoder: Layer = layers.Dense(n_dims)
-                self.value_encoder: Layer = layers.Dense(n_dims)
+                self.key_encoder: Layer = layers.Dense(encoding_dim)
+                self.query_encoder: Layer = layers.Dense(encoding_dim)
+                self.value_encoder: Layer = layers.Dense(encoding_dim)
 
     def _calculate_scores(self,
             queries: tf.Tensor,
@@ -125,12 +126,18 @@ class ProjectedAttentionLayer(Layer):
 
     def build(self, input_shape):
         super().build(input_shape)
+
         if not self.encode:
             query_dims: int = input_shape[0][-1]
             key_dims: int = input_shape[1][-1]
             val_dims: int = input_shape[2][-1]
             assert query_dims == key_dims
-            self.n_dims = val_dims
+            self.encoding_dim = val_dims
+        else:
+            # build submodules
+            self.query_encoder.build(input_shape[0])
+            self.key_encoder.build(input_shape[1])
+            self.value_encoder.build(input_shape[2])
 
     def call(self, qkv):
         """
@@ -147,7 +154,7 @@ class ProjectedAttentionLayer(Layer):
             if self.encode:
                 values = self.value_encoder(values)
                 # tf.Tensor[f32, dev] : (batch, n_query, n_dims)
-            return alignments @ self.value_encoder(values)
+            return alignments @ values
 
 class MultiHeadAttentionLayer(layers.Layer):
     def __init__(self,
@@ -156,7 +163,7 @@ class MultiHeadAttentionLayer(layers.Layer):
             device: tf.device = None,
             **kwargs):
         kwargs = kwargify(locals())
-        super().__init__(**kwargs)
+        super().__init__()
         self.n_heads: int = n_heads
         self.encoding_dim: int = encoding_dim
         self.device: tf.device = optional_device(device)
@@ -187,15 +194,14 @@ class TransformerBaseLayer(layers.Layer):
         self.n_heads: int = n_heads
         self.hidden_nodes: int = hidden_nodes
         self.kwargs = kwargs
-        self.device = device
+        self.device = optional_device(device)
 
         self.mh_attn: MultiHeadAttentionLayer = ...
         self.ffnn: keras.Sequential = ...
 
     def build(self, input_shape):
         n_tokens, n_dims = input_shape[1:]
-        assert n_dims % self.n_heads == 0
-        encoding_dim = n_dims // self.n_heads
+        encoding_dim = int(ceil(n_dims / self.n_heads))
 
         with self.device:
             self.mh_attn = \
@@ -205,7 +211,7 @@ class TransformerBaseLayer(layers.Layer):
                 layers.ReLU(),
                 layers.Dense(n_dims)])
 
-        super().build()
+        super().build(input_shape)
 
 class TransformerLayer(TransformerBaseLayer):
     def __init__(self,
@@ -272,6 +278,7 @@ class TrXLI_Layer(TransformerBaseLayer):
         norm2_out = self.norm2(attn_out)
         lin_out = self.ffnn(norm2_out)
         lin_out += attn_out
+        return lin_out
 
 class TransformerModel(keras.Model):
     def __init__(self,
@@ -282,10 +289,14 @@ class TransformerModel(keras.Model):
             device: tf.device = None,
             layer_type: str = 'classic',
             **kwargs):
-        super().__init__(**kwargs)
+        super().__init__()
+        assert hidden_nodes % n_heads == 0
+        # output of an MHA layer is n_heads * ceil(hidden_nodes/ n_heads)
+        # because we have bypass layers, we need the input and output to be the same
         self.device = optional_device(device)
 
         self.encoder = MultiHeadAttentionLayer(n_heads, encoding_dim, device, **kwargs)
+        self.initial_projection = layers.Dense(hidden_nodes)
 
         layer_type = layer_type.lower()
         if layer_type == 'transformer':
@@ -302,18 +313,21 @@ class TransformerModel(keras.Model):
 
         self.out_layer = layers.Dense(1)
 
-    def call(self, stations: tf.Tensor, cars: tf.Tensor) -> tf.Tensor:
+    def call(self, data: tf.Tensor) -> tf.Tensor:
         """
-
-        :param stations: (batch_dim, n_stations, station_dims)
-        :param cars: (batch_dim, n_cars, car_dim)
+        :param station: should contain the following in a tuple
+            :param stations: (batch_dim, n_stations, station_dims)
+            :param cars: (batch_dim, n_cars, car_dim)
         :return: (batch_dim, n_stations)
         """
+        stations, cars = data
         with self.device:
             car_info: tf.Tensor = self.encoder((stations, cars, cars))
             # (batch_dim, n_stations, encoding_dim)
             data: tf.Tensor = tf.concat((stations, car_info), axis=2)
             # (batch_dim, n_stations, station_dims + encoding_dims)
+            data = self.initial_projection(data)
+            # (batch_dim, n_stations, hidden_nodes)
             for attn in self.attn_layers:
                 data = attn(data)
                 # same size
@@ -328,7 +342,7 @@ def make_model(
         action_space: Space,
         observation_space: Space,
         model: str,
-        device: torch.device,
+        device: tf.device,
         n_nodes: int,
         n_layers: int,
         normalize: bool = True,
@@ -343,7 +357,7 @@ def make_model(
     :param model: str
         one of [feedforward, transformer]
         Type of model to make
-    :param device: torch.device
+    :param device: tf.device
         device to put the model on
     :param n_nodes: int
         number of nodes per layer (or per head)
@@ -371,8 +385,10 @@ def make_model(
         assert 'cars' in observation_space.spaces and 'stations' in observation_space.spaces
         car_dims: int = observation_space['cars'].shape[1]
         station_dims: int = observation_space['stations'].shape[1]
+        assert n_nodes % n_heads == 0
+        encoding_dim = n_nodes / n_heads
         return TransformerModel(n_layers, n_heads, hidden_nodes=n_nodes,
-                encoding_dim=n_nodes, layer_type=model, **kwargs)
+                encoding_dim=encoding_dim, layer_type=model, **kwargs)
     else:
         raise Exception(f"model must be in [feedforward, transformer], got {model}")
 

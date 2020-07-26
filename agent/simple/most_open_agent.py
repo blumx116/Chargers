@@ -2,28 +2,29 @@ from agent import Agent
 
 from gym.spaces import Discrete
 import numpy as np
+import tensorflow as tf
 
 from env import State
 from misc.utils import optional_device
 
 class MostOpenAgent(Agent):
     def __init__(self,
-            device: torch.device = None,
+            device: tf.device = None,
             use_percent: bool = True,
             **kwargs):
         """
-        :param device: torch.device
+        :param device: tf.device
             uses gpu if not provided
         :param kwargs: for compatibility
         """
-        self.device: torch.device = optional_device(device)
+        self.device: tf.device = optional_device(device)
         self.use_percent: bool = use_percent
 
 
     def score(self,
             observation: State,
             context: State,
-            network: str = 'q') -> torch.Tensor:
+            network: str = 'q') -> tf.Tensor:
         """
         gives closer stations higher scores
         :param observation: raw from unwrapped environment
@@ -39,15 +40,15 @@ class MostOpenAgent(Agent):
         else:
             scores = maxes - currents
         # np.ndarray[f32] : [n_stations, 1]
-        scores: torch.Tensor = torch.from_numpy(scores).type(torch.float32)
-        # torch.Tensor[f32, cpu]: [n_stations, 1]
+        scores: tf.Tensor = torch.from_numpy(scores).type(torch.float32)
+        # tf.Tensor[f32, cpu]: [n_stations, 1]
         return scores.to(self.device).squeeze(1).unsqueeze(0)
 
     def act(self,
             observation: State,
             context: State,
             mode='test',
-            network='q') -> torch.Tensor:
+            network='q') -> tf.Tensor:
         """
         gives closer stations higher scores
         :param observation: raw from unwrapped environment
@@ -56,7 +57,7 @@ class MostOpenAgent(Agent):
         :param network: ignored, present for compatibility
         :return: torch[int64, device] : max_index
         """
-        scores: torch.Tensor = self.score(observation, observation)
+        scores: tf.Tensor = self.score(observation, observation)
         # Tensor[f32, dev] : [1, n_stations]
         return scores.max(1)[1].data[0]
 

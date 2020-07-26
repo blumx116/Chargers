@@ -26,13 +26,14 @@ def make_and_wrap_env(
     algorithm = algorithm.lower()
     if algorithm in ['nearest', 'open']:
         return sim
+    assert algorithm == 'dqn', f"Expected algorithm to be one of [nearest, open, dqn], got {algorithm}"
     model = model.lower()
     if model == 'feedforward':
         sim = NormalizedPositionWrapper(sim, kwargs['region'])
         sim = StaticFlatWrapper(sim)
         sim = SummedRewardWrapper(sim)
         return sim
-    if model == 'transformer':
+    if model in ['transformer', 'trxl', 'trxli']:
         sim = NormalizedPositionWrapper(sim, kwargs['region'])
         sim = PositionEncodingWrapper(sim, dimension=10)
         sim = TimeEncodingWrapper(sim, dimension=10)
@@ -40,3 +41,5 @@ def make_and_wrap_env(
         sim = AttentionModelWrapper(sim)
         sim = SummedRewardWrapper(sim)
         return sim
+    raise Exception(f"Expected model to be one of [transformer, trxl, trxli], got {model}")
+

@@ -1,4 +1,4 @@
-from copy import deepcopy
+from tensorflow.keras.models import clone_model
 
 from agent import Agent
 from agent.dqn import make_model, DQNAgent
@@ -22,5 +22,7 @@ def make_agent(
         return MostOpenAgent(**kwargs)
     elif algorithm == 'dqn':
         model = make_model(**kwargs)
-        target = deepcopy(model)
+        target = make_model(**kwargs)
+        # target.set_weights(model.get_weights())
+        # can't copy weights because models haven't been built yet
         return DQNAgent(model, target, **kwargs)

@@ -5,7 +5,7 @@ from copy import deepcopy
 import numpy as np
 from numpy.random import RandomState
 
-from internals.continuous_simulation_engine import ContinuousSimulationEngine
+from env.internals.continuous_simulation_engine import ContinuousSimulationEngine
 from env.simulation_events import ArrivalEvent, QueryEvent, Arrivals, Queries
 from misc.utils import optional_random, array_shuffle, kwargify
 

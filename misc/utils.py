@@ -43,11 +43,11 @@ def optional_random(rand_seed: Union[int, RandomState] = None):
         return rand_seed
 
 def optional_device(device: Union[str, tf.device] = None) -> tf.device:
-    if isinstance(device, tf.device):
-        return device
-    elif device is None:
+    if device is None:
         device: str = "/GPU:0" if len(tf.config.list_physical_devices('GPU')) else "/device:CPU:0"
-    return tf.device(device)
+    if isinstance(device, str):
+        return tf.device(device)
+    return device
 
 def array_unique(data: Iterable[np.ndarray], return_inverse=False, 
         return_counts = False) -> List[np.ndarray]:
@@ -224,7 +224,7 @@ PROJECT_BASE_DIR: str = os.path.abspath(os.path.join(
     os.path.pardir))
 
 
-def is_onehot(vec: Union[torch.Tensor, np.ndarray]) -> bool:
+def is_onehot(vec: Union[tf.Tensor, np.ndarray]) -> bool:
     return vec.sum() == vec.max() == 1.
 
 def kwargify(locals: Dict[str, Any]) -> Dict[str, Any]:

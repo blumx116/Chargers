@@ -18,6 +18,8 @@ class OneHotIndexWrapper(gym.core.ObservationWrapper, ContinuousSimulation):
         self.max_cars = self.observation_space.spaces['car_locs'].shape[0]
         self.observation_space.spaces['car_dest_idx'] = Box(
             0, 1, (self.max_cars, self.n_stations), dtype=np.int32)
+        self.observation_space.spaces['station_idx'] = Box(
+            0, 1, (self.n_stations, self.n_stations), dtype=np.int32)
 
     def observation(self,
             observation: State) -> State:
@@ -29,7 +31,7 @@ class OneHotIndexWrapper(gym.core.ObservationWrapper, ContinuousSimulation):
         station_indices = station_indices[:, 0, :]
         # [n_stations, n_stations] should be eye(n_stations)
         return State(
-            station_idx=observation.station_idx,
+            station_idx=station_indices,
             station_locations=observation.station_locations,
             station_maxes=observation.station_maxes,
             station_occs=observation.station_occs,

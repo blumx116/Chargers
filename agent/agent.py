@@ -1,10 +1,11 @@
 from env import State, Action
+import tensorflow as tf
 
 class Agent:
-    def score(self, observation, context, network='q') -> torch.Tensor:
+    def score(self, observation, context, network='q') -> tf.Tensor:
         pass
 
-    def act(self, observation, context, mode='test', network='q') -> torch.Tensor:
+    def act(self, observation, context, mode='test', network='q') -> tf.Tensor:
         pass
 
     def optimize(self) -> None:

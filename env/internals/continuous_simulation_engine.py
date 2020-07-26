@@ -16,7 +16,7 @@ Reward = np.ndarray # np.ndarray[float32] : [n_stations,]
 SimulationState = NamedTuple(
     "SimulationState",
     [('station_idx', np.ndarray),  # np.ndarray[f32] : [n_stations, 1]
-    ('station_locations', np.ndarray),  # np.ndarray[float32] : [n_stations, 2] => (x, y)
+     ('station_locations', np.ndarray),  # np.ndarray[float32] : [n_stations, 2] => (x, y)
      ("station_occs", np.ndarray),  # np.ndarray[int32] : [n_stations, 1]
      ("station_maxes", np.ndarray), # np.ndarray[int32] : [n_stations, 1]
      ("car_locs", np.ndarray),  # np.ndarray[float32]: [n_stations 2 => (x, y)
