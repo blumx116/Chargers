@@ -2,17 +2,35 @@ from numbers import Number
 from typing import Iterator, List, Callable, Dict
 
 import numpy as np
+import tensorflow as tf
 
 from agent import Agent
 from agent.dqn import ReplayBuffer
 from env import ContinuousSimulation
-from misc.utils import flatmap
+from misc.utils import flatmap, optional_writer
+
+def initial_log(
+        agent: Agent,
+        env: ContinuousSimulation,
+        writer: tf.summary.SummaryWriter = None,
+        **kwargs) -> None:
+    writer = optional_writer(writer)
+
+    state = env.reset()
+    context = env.unwrapped.state()
+
+    if hasattr(agent, 'score'):
+        # RUN 1-Time code to log graph
+        pass
+
+
 
 
 def diagnostic(
         agent: Agent,
         env: ContinuousSimulation,
-        seeds: Iterator[int] = None) -> None:
+        seeds: Iterator[int] = None,
+        writer: tf.summary.SummaryWriter = None) -> None:
     """
 
     :param agent: Agent
@@ -22,10 +40,13 @@ def diagnostic(
     :param seeds:
         seeds to reset environment with, tests will be evaluated on these seeds
         defaults to range(0, 10)
+    :param writer: tf.summary.SummaryWriter
+        writer to use as context. Writes no-ops if None
     :return: all results logged to either wandb or console
     """
     if seeds is None:
         seeds = iter(range(0, 10))
+    writer = optional_writer(writer)
     seed = next(seeds, None)
 
     rewards: List[float] = []
@@ -88,40 +109,27 @@ def diagnostic(
     for summ in summaries:
         agg_summary['recommendation freq'][0:summ['n_stations']] += summ['recommendation freq']
 
-
-    """
-    def janky_histogram(seq: np.ndarray):
-        return wandb.Histogram(np_histogram=(seq, np.arange(len(seq) + 1)))
     # these values count the number of queries per timestep summed over all episodes
     histograms: List[str] = ['distances travelled', 'timesteps travelled', 'nearest distances']
-    if use_wandb:
-        dist_histogram = np.histogram(agg_summary['distances travelled'], bins=20)
-        near_histogram = np.histogram(agg_summary['nearest distances'], bins=20)
+    dist_histogram = np.histogram(agg_summary['distances travelled'], bins=20)
+    near_histogram = np.histogram(agg_summary['nearest distances'], bins=20)
 
-        exp_bins: np.ndarray = 2 ** np.arange(0, 10)
-        exp_bins = np.insert(exp_bins, 0, 0, axis=0)
-        # [0, 1, 2, 4, 8, 16, 32, 64, 128, 512]
-        failed_histogram = np.histogram(agg_summary['failed dispatches'], bins=exp_bins)
-        organic_histogram = np.histogram(agg_summary['organic fails'], bins=exp_bins)
-        time_histogram = np.histogram(agg_summary['timesteps travelled'], bins=np.arange(max_ts+1))
+    exp_bins: np.ndarray = 2 ** np.arange(0, 10)
+    exp_bins = np.insert(exp_bins, 0, 0, axis=0)
+    # [0, 1, 2, 4, 8, 16, 32, 64, 128, 512]
+    failed_histogram = np.histogram(agg_summary['failed dispatches'], bins=exp_bins)
+    organic_histogram = np.histogram(agg_summary['organic fails'], bins=exp_bins)
+    time_histogram = np.histogram(agg_summary['timesteps travelled'], bins=np.arange(max_ts+1))
 
-        wandb.log({
-            'distances travelled': wandb.Histogram(sequence=agg_summary['distances travelled']),
-            'nearest distances': wandb.Histogram(sequence=agg_summary['nearest distances']),
-            'timesteps travelled': wandb.Histogram(np_histogram=time_histogram),
-            'failed dispatches': wandb.Histogram(np_histogram=failed_histogram),
-            'organic fails': wandb.Histogram(np_histogram=organic_histogram)
-        })
-    else:
-        for key in agg_summary:
-            print(key, end=' : ')
-            print(agg_summary[key])
-        print('===================================')
-
-    log(use_wandb, {'Reward': np.mean(rewards)})
-    if hasattr(agent, 'compute_td_loss'):
-        log(use_wandb, {'Loss': np.mean(losses)})
-    """
+    with writer.as_default():
+        tf.summary.histogram('distances travelled', agg_summary['distances travelled'])
+        tf.summary.histogram('nearest distances', agg_summary['nearest distances'])
+        tf.summary.histogram('timesteps travelled', agg_summary['timesteps travelled'])
+        tf.summary.histogram('failed dispatches', agg_summary['failed dispatches'])
+        tf.summary.histogram('organic fails', agg_summary['organic fails'])
+        tf.summary.scalar('Reward', np.mean(rewards))
+        if hasattr(agent, 'compute_td_loss'):
+            tf.summary.scalar('loss', np.mean(losses))
 
 
 def train(agent: Agent,
@@ -130,6 +138,7 @@ def train(agent: Agent,
           test_every: int,
           target_network_update_freq: int,
           max_ts: int,
+          writer: tf.summary.SummaryWriter = None,
           env_seeds: Iterator[int] = None,
           test: Callable[[Agent], None] = None,
           **kwargs) -> Agent:
@@ -145,6 +154,8 @@ def train(agent: Agent,
         every 'test_every' timesteps, runs the test function on agent and env
     :param target_network_update_freq: int
         updates the target_network with this frequency (in timesteps)
+    :param writer: tf.SummaryWriter
+        writer to write logs with
     :param max_ts: int
         will stop training after max_ts timesteps
     :param env_seeds:
@@ -161,6 +172,7 @@ def train(agent: Agent,
 
     if env_seeds is not None:
         env.seed(next(env_seeds))
+    writer = optional_writer(writer)
     state = env.reset()
     context = env.unwrapped.state()
 
@@ -187,17 +199,13 @@ def train(agent: Agent,
             agent.optimize()
         agent.step(ts)
 
-        if ts % 100:
-            print(ts)
-
-        if ts % log_every == 0:
-            """
-            log(use_wandb,
-                { 'global timestep': ts,
-                'num updates': (ts / target_network_update_freq),
-                'num episodes': n_eps_completed})
-            """
-            agent.log(ts)
+        with writer.as_default():
+            if ts % log_every == 0:
+                tf.summary.experimental.set_step(ts)
+                tf.summary.scalar('global timestep', ts)
+                tf.summary.scalar('num updates', ts // target_network_update_freq)
+                tf.summary.scalar('num episodes', n_eps_completed)
+                agent.log(ts, writer)
 
         if ts % test_every == 0 and test is not None:
             test(agent)

@@ -42,12 +42,21 @@ def optional_random(rand_seed: Union[int, RandomState] = None):
     else:
         return rand_seed
 
-def optional_device(device: Union[str, tf.device] = None) -> tf.device:
+
+def optional_device(
+        device: Union[str, tf.device] = None) -> tf.device:
     if device is None:
         device: str = "/GPU:0" if len(tf.config.list_physical_devices('GPU')) else "/device:CPU:0"
     if isinstance(device, str):
         return tf.device(device)
     return device
+
+
+def optional_writer(
+        writer: tf.summary.SummaryWriter = None) -> tf.summary.SummaryWriter:
+    if writer is None:
+        writer = tf.summary.create_noop_writer()
+    return writer
 
 def array_unique(data: Iterable[np.ndarray], return_inverse=False, 
         return_counts = False) -> List[np.ndarray]:

@@ -1,4 +1,7 @@
 from copy import deepcopy
+from datetime import datetime
+import os
+from time import time
 import warnings
 
 import numpy.random as rand
@@ -7,10 +10,13 @@ import numpy as np
 from agent.diagnostic import train, diagnostic
 from agent import make_agent
 from env import make_and_wrap_env
+from misc.utils import root_dir
 import tensorflow as tf
 
 
 warnings.simplefilter('once')
+
+LOG_TENSORBOARD = True
 
 settings = {
     'algorithm': 'dqn',
@@ -49,8 +55,18 @@ settings.update({
     'device': tf.device("/physical_device:GPU:0"),
 })
 
+if LOG_TENSORBOARD:
+    cur_time: str = datetime.fromtimestamp(time()).strftime("%d-%m-%Y-%H-%M")
+    run_name = f"{settings['algorithm']} ({settings['model']})=={settings['date']}=={cur_time}"
+    writer = tf.summary.create_file_writer(os.path.join(root_dir, "logs", run_name))
+else:
+    writer = tf.summary.create_noop_writer()
+
 agent = make_agent(**settings)
 test = lambda agent: diagnostic(
     agent=agent, env=sim,
-    seeds=iter(range(1, 10)))
-train(agent, sim, test=test, **settings)
+    seeds=iter(range(1, 10)),
+    writer=writer)
+
+with writer.as_default():
+    train(agent, sim, test=test, writer=writer, **settings)

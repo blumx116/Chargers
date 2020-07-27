@@ -82,14 +82,6 @@ class DQNAgent(Agent):
         assert network in ['q', 'target']
         network = self.q_network if network == 'q' else self.target_q_network
         return network(observation)
-        """
-        if isinstance(observation, list) or isinstance(observation, tuple):
-            # state = list(map(self._convert_state, observation))
-            return network(observation)
-        else:
-            # state = self._convert_state(observation)
-            return network(observation)
-        """
 
     def update_target_network(self) -> None:
         self.target_q_network.set_weights(self.q_network.get_weights())
@@ -166,7 +158,9 @@ class DQNAgent(Agent):
         if global_timestep % self.target_update_freq == 0:
             self.update_target_network()
 
-    def log(self, global_timestep: int) -> None:
+    def log(self,
+            global_timestep: int,
+            writer: tf.summary.SummaryWriter) -> None:
         ...
 
     def _add_batch_dim(self, state: np.ndarray) -> np.ndarray:

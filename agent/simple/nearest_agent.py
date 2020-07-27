@@ -72,5 +72,7 @@ class NearestAgent(Agent):
     def step(self, global_timestep: int) -> None:
         pass
 
-    def log(self, global_timestep: int) -> None:
+    def log(self,
+            global_timestep: int,
+            writer: tf.summary.SummaryWriter) -> None:
         pass
