@@ -66,22 +66,56 @@ class DQNAgent(Agent):
     def act(self,
             observation: Union[State, np.ndarray, Tuple],
             context: Any,
-            mode: str = 'test',
-            network: str = 'q'):
+            **kwargs):
         if isinstance(observation, tuple):
             state = tuple(map(self._add_batch_dim, observation))
         else:
             state = self._add_batch_dim(observation)
-        q_value = self.score(state, context, network)
+        q_value = self.score(state, context, **kwargs)
         return tf.math.argmax(q_value, axis=1).numpy()
 
     def score(self,
             observation: Union[State, np.ndarray, Tuple],
             context: Any,
-            network: str = 'q') -> tf.Tensor:
+            network: str = 'q',
+            log_graph: bool = False,
+            **kwargs) -> tf.Tensor:
         assert network in ['q', 'target']
-        network = self.q_network if network == 'q' else self.target_q_network
-        return network(observation)
+        """
+        The following looks really weird, but there's a logic to it. 
+        In order to log a keras model without using fit(), you currently need to call 
+        tf.trace_on() directly prior to to a tf.function in order to log the graph in that tf.function.
+        HOWEVER, each tf.function can only assign variables the first time it is called. 
+        Keras models need to build the first time they are called, which assigns variables.
+        As a result, both networks need to have separate tf.functions. 
+        Additionally, there's a bug in trace_on() where you can't call any functions before the one you want
+        to trace.
+        """
+        if isinstance(observation, (tuple, list)) and len(observation) == 1:
+            observation = observation[0]
+        if network == 'q':
+            if log_graph:
+                tf.summary.trace_on()
+            result = self._run_q_(observation)
+            if log_graph:
+                tf.summary.trace_export("Q-Network")
+        else:
+            if log_graph:
+                tf.summary.trace_on()
+            result = self._run_target_(observation)
+            if log_graph:
+                tf.summary.trace_export("Target Network")
+        if log_graph:
+            tf.summary.flush()
+        return result
+
+    @tf.function
+    def _run_q_(self, observation):
+        return self.q_network(observation)
+
+    @tf.function
+    def _run_target_(self, observation):
+        return self.target_q_network(observation)
 
     def update_target_network(self) -> None:
         self.target_q_network.set_weights(self.q_network.get_weights())
@@ -165,3 +199,7 @@ class DQNAgent(Agent):
 
     def _add_batch_dim(self, state: np.ndarray) -> np.ndarray:
         return state[np.newaxis, ...]
+
+@tf.function
+def _run_(network, observation):
+    return network(observation)

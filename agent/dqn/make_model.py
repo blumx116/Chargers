@@ -379,7 +379,7 @@ def make_model(
     model: str = model.lower()
     if model == 'feedforward':
         assert isinstance(observation_space, Box)
-        return FeedforwardModel(n_layers, n_nodes, n_actions, **kwargs)
+        return FeedforwardModel(n_layers, n_nodes, n_actions, normalize)
     elif model in ['trxl', 'trxli', 'transformer']:
         assert isinstance(observation_space, Dict)
         assert 'cars' in observation_space.spaces and 'stations' in observation_space.spaces
@@ -390,5 +390,5 @@ def make_model(
         return TransformerModel(n_layers, n_heads, hidden_nodes=n_nodes,
                 encoding_dim=encoding_dim, layer_type=model, **kwargs)
     else:
-        raise Exception(f"model must be in [feedforward, transformer], got {model}")
+        raise Exception(f"model must be in [feedforward, transformer, trxl, trxli], got {model}")
 

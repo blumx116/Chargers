@@ -20,7 +20,7 @@ LOG_TENSORBOARD = True
 
 settings = {
     'algorithm': 'dqn',
-    'model': 'trxli',
+    'model': 'feedforward',
     'n_layers': 2,
     'n_heads': 4,
     'n_nodes' : 160,

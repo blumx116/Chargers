@@ -19,11 +19,10 @@ def initial_log(
     state = env.reset()
     context = env.unwrapped.state()
 
-    if hasattr(agent, 'score'):
-        # RUN 1-Time code to log graph
-        pass
+    agent.act(state, context, network='q', log_graph=True)
+    agent.act(state, context, network='target', log_graph=True)
 
-
+    # TODO: log hyperparameters
 
 
 def diagnostic(
@@ -169,6 +168,8 @@ def train(agent: Agent,
     :return: the Agent, after training
     """
     episode_reward = 0
+    tf.summary.experimental.set_step(0)
+    initial_log(agent, env, writer, **kwargs)
 
     if env_seeds is not None:
         env.seed(next(env_seeds))

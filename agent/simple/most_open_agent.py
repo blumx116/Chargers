@@ -24,7 +24,7 @@ class MostOpenAgent(Agent):
     def score(self,
             observation: State,
             context: State,
-            network: str = 'q') -> tf.Tensor:
+            **kwargs) -> tf.Tensor:
         """
         gives closer stations higher scores
         :param observation: raw from unwrapped environment
